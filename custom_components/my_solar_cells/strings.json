@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tibber API Key",
+        "description": "Enter your Tibber API key. You can find it at https://developer.tibber.com/settings/access-token",
+        "data": {
+          "api_key": "API Key"
+        }
+      },
+      "home": {
+        "title": "Select Home",
+        "description": "Select which Tibber home to use for energy data.",
+        "data": {
+          "home_id": "Home",
+          "import_only_spot_price": "Import only spot prices (use HA sensors for consumption/production)",
+          "tibber_start_year": "Tibber Import Start Year"
+        }
+      },
+      "sensors": {
+        "title": "Home Assistant Sensors",
+        "description": "Select the sensor for total solar production. Grid export/import are fetched from Tibber by default. Only set grid sensors if you have separate HA sensors you want to use instead.",
+        "data": {
+          "production_sensor": "Total Production Sensor (kWh total solar production)",
+          "grid_export_sensor": "Grid Export Sensor (optional, overrides Tibber)",
+          "grid_import_sensor": "Grid Import Sensor (optional, overrides Tibber)",
+          "battery_charge_sensor": "Battery Charge Sensor (optional)",
+          "battery_discharge_sensor": "Battery Discharge Sensor (optional)"
+        }
+      },
+      "financial": {
+        "title": "Financial Parameters",
+        "description": "Configure the financial parameters for your solar energy calculations.",
+        "data": {
+          "tax_reduction": "Tax Reduction (SEK/kWh sold)",
+          "grid_compensation": "Grid Compensation (SEK/kWh)",
+          "transfer_fee": "Transfer Fee (SEK/kWh)",
+          "energy_tax": "Energy Tax (SEK/kWh)",
+          "installed_kw": "Installed Capacity (kW)"
+        }
+      },
+      "investment": {
+        "title": "Investment & ROI",
+        "description": "Enter your solar investment details for ROI tracking.",
+        "data": {
+          "investment_amount": "Investment Amount (SEK)",
+          "loan_amount": "Loan Amount (SEK)",
+          "interest_rate": "Interest Rate (%)",
+          "amortization_monthly": "Monthly Amortization (SEK)",
+          "panel_degradation": "Panel Degradation (%/year)",
+          "price_development": "Price Development (%/year)",
+          "installation_date": "Installation Date (YYYY-MM-DD)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key. Please check your Tibber access token.",
+      "cannot_connect": "Could not connect to Tibber API. Please try again."
+    },
+    "abort": {
+      "already_configured": "This home is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sensor Configuration",
+        "data": {
+          "grid_export_sensor": "Grid Export Sensor",
+          "grid_import_sensor": "Grid Import Sensor",
+          "production_sensor": "Total Production Sensor",
+          "battery_charge_sensor": "Battery Charge Sensor",
+          "battery_discharge_sensor": "Battery Discharge Sensor",
+          "tibber_start_year": "Tibber Import Start Year"
+        }
+      },
+      "financial": {
+        "title": "Financial Parameters",
+        "data": {
+          "tax_reduction": "Tax Reduction (SEK/kWh)",
+          "grid_compensation": "Grid Compensation (SEK/kWh)",
+          "transfer_fee": "Transfer Fee (SEK/kWh)",
+          "energy_tax": "Energy Tax (SEK/kWh)",
+          "installed_kw": "Installed Capacity (kW)"
+        }
+      },
+      "yearly_params": {
+        "title": "Per-Year Financial Parameters",
+        "description": "Select a year to configure year-specific financial rates, or choose Done to continue. {configured_years}",
+        "data": {
+          "selected_year": "Select Year"
+        }
+      },
+      "yearly_params_edit": {
+        "title": "Financial Parameters for {year}",
+        "description": "Set the financial rates that apply for this specific year.",
+        "data": {
+          "tax_reduction": "Tax Reduction (SEK/kWh)",
+          "grid_compensation": "Grid Compensation (SEK/kWh)",
+          "transfer_fee": "Transfer Fee (SEK/kWh)",
+          "energy_tax": "Energy Tax (SEK/kWh)",
+          "installed_kw": "Installed Capacity (kW)"
+        }
+      },
+      "investment": {
+        "title": "Investment & ROI",
+        "data": {
+          "investment_amount": "Investment Amount (SEK)",
+          "loan_amount": "Loan Amount (SEK)",
+          "interest_rate": "Interest Rate (%)",
+          "amortization_monthly": "Monthly Amortization (SEK)",
+          "panel_degradation": "Panel Degradation (%/year)",
+          "price_development": "Price Development (%/year)",
+          "installation_date": "Installation Date"
+        }
+      }
+    }
+  }
+}
