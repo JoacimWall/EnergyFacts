@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -29,7 +30,7 @@ from .const import (
     DEFAULT_PRICE_DEVELOPMENT,
     DOMAIN,
 )
-from .financial_engine import CalcParams, calculate_period, generate_monthly_report
+from .financial_engine import CalcParams, calculate_period, generate_monthly_report, get_calc_params_for_year
 from .heat_source_engine import calculate_heat_source_period
 from .roi_engine import calculate_30_year_projection
 from .simulation_engine import simulate_battery_add, simulate_battery_remove
@@ -644,27 +645,65 @@ async def ws_get_heat_source_breakdown(
         total_energy = sum(s.total_energy_kwh for s in period_stats)
         total_cost = sum(s.total_cost_sek for s in period_stats)
 
-        return {
-            "heat_sources": [
-                {
-                    "heat_source_id": s.heat_source_id,
-                    "heat_source_name": s.heat_source_name,
-                    "total_energy_kwh": round(s.total_energy_kwh, 4),
-                    "total_cost_sek": round(s.total_cost_sek, 2),
-                    "components": [
-                        {
-                            "component_id": c.component_id,
-                            "component_name": c.component_name,
-                            "energy_kwh": round(c.energy_kwh, 4),
-                            "cost_sek": round(c.cost_sek, 2),
-                            "avg_power_w": round(c.avg_power_w, 1),
-                            "percentage_of_total": round(c.percentage_of_total, 1),
+        result_sources = []
+        for s in period_stats:
+            entry: dict = {
+                "heat_source_id": s.heat_source_id,
+                "heat_source_name": s.heat_source_name,
+                "total_energy_kwh": round(s.total_energy_kwh, 4),
+                "total_cost_sek": round(s.total_cost_sek, 2),
+                "has_solar": s.has_solar,
+                "components": [
+                    {
+                        "component_id": c.component_id,
+                        "component_name": c.component_name,
+                        "energy_kwh": round(c.energy_kwh, 4),
+                        "cost_sek": round(c.cost_sek, 2),
+                        "avg_power_w": round(c.avg_power_w, 1),
+                        "percentage_of_total": round(c.percentage_of_total, 1),
+                    }
+                    for c in s.components
+                ],
+            }
+
+            if s.has_solar:
+                # Compute solar_value_sek with yearly tax-reduction cap
+                src_records = [r for r in records if r["heat_source_id"] == s.heat_source_id]
+                by_year: dict[str, dict] = {}
+                for r in src_records:
+                    year = r["timestamp"][:4]
+                    if year not in by_year:
+                        by_year[year] = {
+                            "solar_kwh": 0.0,
+                            "purchased_kwh": 0.0,
+                            "solar_spot_sek": 0.0,
                         }
-                        for c in s.components
-                    ],
-                }
-                for s in period_stats
-            ],
+                    by_year[year]["solar_kwh"] += r.get("solar_energy_kwh") or 0.0
+                    by_year[year]["purchased_kwh"] += r.get("energy_kwh") or 0.0
+                    by_year[year]["solar_spot_sek"] += r.get("solar_spot_value_sek") or 0.0
+
+                solar_value_total = 0.0
+                for year_str, ydata in by_year.items():
+                    yp = get_calc_params_for_year(
+                        year_str, coordinator._calc_params, coordinator._yearly_params
+                    )
+                    cap = min(ydata["solar_kwh"], ydata["purchased_kwh"])
+                    tax_reduction = cap * yp.tax_reduction
+                    solar_value_total += (
+                        ydata["solar_spot_sek"]
+                        + ydata["solar_kwh"] * yp.grid_compensation
+                        + tax_reduction
+                    )
+
+                entry["solar_energy_kwh"] = round(s.solar_energy_kwh, 4)
+                entry["solar_value_sek"] = round(solar_value_total, 2)
+                entry["purchased_kwh"] = round(s.purchased_kwh, 4)
+                entry["purchased_cost_sek"] = round(s.purchased_cost_sek, 2)
+
+            result_sources.append(entry)
+
+        return {
+            "heat_sources": result_sources,
             "total_energy_kwh": round(total_energy, 4),
             "total_cost_sek": round(total_cost, 2),
         }
@@ -703,6 +742,16 @@ async def ws_save_heat_source(
 
     db = coordinator.storage
 
+    config_str = msg["config"]
+    try:
+        config_parsed = json.loads(config_str) if config_str else {}
+    except (json.JSONDecodeError, TypeError):
+        config_parsed = {}
+
+    if config_parsed.get("has_compressor") and config_parsed.get("has_solar"):
+        connection.send_error(msg["id"], "invalid_config", "has_compressor and has_solar are mutually exclusive")
+        return
+
     def _save():
         db.upsert_heat_source(
             id=msg["heat_source_id"],
@@ -710,7 +759,7 @@ async def ws_save_heat_source(
             source_type="power_threshold",
             energy_sensor=msg["energy_sensor"],
             power_sensor=msg["power_sensor"],
-            config=msg["config"],
+            config=config_str,
         )
         # Clear backfill flag and old data so backfill re-runs with new config
         db._set_meta(f"heat_backfill_done_{msg['heat_source_id']}", None)

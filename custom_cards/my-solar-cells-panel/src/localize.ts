@@ -211,6 +211,14 @@ type TranslationKey =
   | "heat.rebackfill"
   | "heat.rebackfillConfirm"
   | "heat.rebackfillSuccess"
+  | "heat.modeStandard"
+  | "heat.modeCompressor"
+  | "heat.modeSolar"
+  | "heat.solarSensor"
+  | "heat.solarKwh"
+  | "heat.solarValue"
+  | "heat.purchasedKwh"
+  | "heat.purchasedCost"
   // Hourly Heat
   | "tab.hourlyHeat"
   | "hourlyHeat.title"
@@ -450,6 +458,14 @@ const en: Record<TranslationKey, string> = {
   "heat.rebackfill": "Re-import",
   "heat.rebackfillConfirm": "Delete all data for \"{0}\" and re-import history?",
   "heat.rebackfillSuccess": "Data deleted. History will be imported automatically within ~15 minutes.",
+  "heat.modeStandard": "Single consumer",
+  "heat.modeCompressor": "Heat pump (compressor + immersion heater)",
+  "heat.modeSolar": "Self-consuming with own solar",
+  "heat.solarSensor": "Solar energy sensor (kWh, cumulative)",
+  "heat.solarKwh": "Solar energy",
+  "heat.solarValue": "Solar value",
+  "heat.purchasedKwh": "Purchased energy",
+  "heat.purchasedCost": "Purchased cost",
   // Hourly Heat
   "tab.hourlyHeat": "Hourly Heat",
   "hourlyHeat.title": "Hourly Heat Source Records",
@@ -691,6 +707,14 @@ const sv: Record<TranslationKey, string> = {
   "heat.rebackfill": "Importera om",
   "heat.rebackfillConfirm": "Radera all data för \"{0}\" och importera om historik?",
   "heat.rebackfillSuccess": "Data raderad. Historik importeras automatiskt inom ~15 minuter.",
+  "heat.modeStandard": "Enkel konsument",
+  "heat.modeCompressor": "Värmepump (kompressor + elpatron)",
+  "heat.modeSolar": "Självkonsumtion med eget solel",
+  "heat.solarSensor": "Solel-sensor (kWh, kumulativ)",
+  "heat.solarKwh": "Solenergi",
+  "heat.solarValue": "Solvärde",
+  "heat.purchasedKwh": "Köpt energi",
+  "heat.purchasedCost": "Köpt kostnad",
   // Hourly Heat
   "tab.hourlyHeat": "Timdata värme",
   "hourlyHeat.title": "Timdata f\u00f6r v\u00e4rmek\u00e4llor",

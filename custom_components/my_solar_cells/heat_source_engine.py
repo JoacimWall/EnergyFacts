@@ -20,6 +20,8 @@ class HeatSourceConfig:
     energy_sensor: str
     power_sensor: str = ""  # Optional — kept for backwards compatibility
     has_compressor: bool = True
+    has_solar: bool = False
+    solar_sensor: str = ""
     components: list[dict] = field(default_factory=list)
     electric_heater_threshold_w: float = DEFAULT_ELPATRON_THRESHOLD_W
 
@@ -54,6 +56,11 @@ class HeatSourcePeriodStats:
     components: list[ComponentPeriodStats]
     total_energy_kwh: float
     total_cost_sek: float
+    has_solar: bool = False
+    solar_energy_kwh: float = 0.0
+    solar_spot_value_sek: float = 0.0
+    purchased_kwh: float = 0.0
+    purchased_cost_sek: float = 0.0
 
 
 def split_energy_by_power(
@@ -142,12 +149,16 @@ def calculate_heat_source_period(
                 "cost_sek": 0,
                 "power_sum": 0,
                 "count": 0,
+                "solar_energy_kwh": 0,
+                "solar_spot_value_sek": 0,
             }
         agg = by_source[hs_id][comp]
         agg["energy_kwh"] += rec.get("energy_kwh", 0)
         agg["cost_sek"] += rec.get("cost_sek", 0)
         agg["power_sum"] += rec.get("avg_power_w", 0)
         agg["count"] += 1
+        agg["solar_energy_kwh"] += rec.get("solar_energy_kwh", 0)
+        agg["solar_spot_value_sek"] += rec.get("solar_spot_value_sek", 0)
 
     results = []
     for hs_id, comp_data in by_source.items():
@@ -158,13 +169,18 @@ def calculate_heat_source_period(
             config_parsed = json.loads(config_json) if isinstance(config_json, str) else config_json
         except (json.JSONDecodeError, TypeError):
             config_parsed = {}
+        has_solar = config_parsed.get("has_solar", False)
         comp_names = {
             c["id"]: c["name"]
             for c in config_parsed.get("components", [])
         }
 
-        total_energy = sum(c["energy_kwh"] for c in comp_data.values())
+        purchased_kwh = sum(c["energy_kwh"] for c in comp_data.values())
         total_cost = sum(c["cost_sek"] for c in comp_data.values())
+        total_solar_kwh = sum(c["solar_energy_kwh"] for c in comp_data.values())
+        total_solar_spot_sek = sum(c["solar_spot_value_sek"] for c in comp_data.values())
+        # For solar-mode sources total energy = purchased + solar
+        total_energy = purchased_kwh + (total_solar_kwh if has_solar else 0)
 
         components = []
         for comp_id, agg in comp_data.items():
@@ -185,6 +201,11 @@ def calculate_heat_source_period(
             components=components,
             total_energy_kwh=total_energy,
             total_cost_sek=total_cost,
+            has_solar=has_solar,
+            solar_energy_kwh=total_solar_kwh,
+            solar_spot_value_sek=total_solar_spot_sek,
+            purchased_kwh=purchased_kwh,
+            purchased_cost_sek=total_cost,
         ))
 
     return results
@@ -198,9 +219,15 @@ def load_heat_source_config(db_row: dict) -> HeatSourceConfig:
     except (json.JSONDecodeError, TypeError):
         config_data = {}
 
-    has_compressor = config_data.get("has_compressor", True)
+    has_solar = config_data.get("has_solar", False)
+    # has_solar and has_compressor are mutually exclusive; solar wins
+    has_compressor = config_data.get("has_compressor", True) and not has_solar
 
-    if has_compressor:
+    if has_solar:
+        default_components = [
+            {"id": "electric_heater", "name": "Electricity use"},
+        ]
+    elif has_compressor:
         default_components = [
             {"id": "heat_pump", "name": "Kompressorvärme"},
             {"id": "electric_heater", "name": "Immersion heater"},
@@ -216,6 +243,8 @@ def load_heat_source_config(db_row: dict) -> HeatSourceConfig:
         energy_sensor=db_row["energy_sensor"],
         power_sensor=db_row.get("power_sensor", ""),
         has_compressor=has_compressor,
+        has_solar=has_solar,
+        solar_sensor=config_data.get("solar_sensor", ""),
         components=config_data.get("components", default_components),
         electric_heater_threshold_w=config_data.get(
             "electric_heater_threshold_w", DEFAULT_ELPATRON_THRESHOLD_W

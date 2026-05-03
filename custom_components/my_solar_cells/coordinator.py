@@ -618,35 +618,75 @@ class MySolarCellsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         implied_power_w = (energy_delta / elapsed_hours) * 1000
 
-        # Split energy between components
-        splits = split_energy_by_power(implied_power_w, energy_delta, hs)
-
         # Look up spot price for current hour
         spot_price = self._storage.get_average_price_for_hour(hour_iso) or 0.0
 
-        # Get transfer_fee + energy_tax for the year
+        # Get per-year financial params
         year_str = hour_iso[:4]
         year_params = get_calc_params_for_year(year_str, self._calc_params, self._yearly_params)
-        fixed_cost_per_kwh = year_params.transfer_fee + year_params.energy_tax
 
-        # Store each component's energy
-        def _store():
-            for split in splits:
-                if split.energy_kwh <= 0:
-                    continue
-                cost = split.energy_kwh * (spot_price + fixed_cost_per_kwh)
+        if hs.has_solar and hs.solar_sensor:
+            # Solar self-consumption mode — split into purchased vs solar
+            solar_delta = 0.0
+            solar_state = self.hass.states.get(hs.solar_sensor)
+            if solar_state and solar_state.state not in ("unknown", "unavailable"):
+                try:
+                    current_solar = float(solar_state.state)
+                    solar_key = f"solar_{hs.id}"
+                    previous_solar = self._last_heat_readings.get(solar_key)
+                    self._last_heat_readings[solar_key] = current_solar
+                    if previous_solar is not None and current_solar >= previous_solar:
+                        solar_delta = current_solar - previous_solar
+                except (ValueError, TypeError):
+                    pass
+            solar_delta = max(0.0, min(solar_delta, energy_delta))
+            purchased_delta = energy_delta - solar_delta
+
+            fixed_per_kwh = year_params.transfer_fee + year_params.energy_tax
+            purchased_cost = purchased_delta * (spot_price + fixed_per_kwh)
+
+            unit_price_sold = self._storage.get_unit_price_sold_for_hour(hour_iso)
+            if unit_price_sold is None:
+                unit_price_sold = spot_price
+            solar_spot_value = solar_delta * unit_price_sold
+
+            def _store_solar():
                 self._storage.upsert_heat_source_energy(
                     timestamp=hour_iso,
                     heat_source_id=hs.id,
-                    component=split.component,
-                    energy_kwh=split.energy_kwh,
-                    cost_sek=cost,
-                    avg_power_w=split.power_w,
+                    component="electric_heater",
+                    energy_kwh=purchased_delta,
+                    cost_sek=purchased_cost,
+                    avg_power_w=implied_power_w,
                     spot_price=spot_price,
                     samples=1,
+                    solar_energy_kwh=solar_delta,
+                    solar_spot_value_sek=solar_spot_value,
                 )
 
-        await self.hass.async_add_executor_job(_store)
+            await self.hass.async_add_executor_job(_store_solar)
+        else:
+            # Standard mode — split by power threshold into components
+            splits = split_energy_by_power(implied_power_w, energy_delta, hs)
+            fixed_cost_per_kwh = year_params.transfer_fee + year_params.energy_tax
+
+            def _store():
+                for split in splits:
+                    if split.energy_kwh <= 0:
+                        continue
+                    cost = split.energy_kwh * (spot_price + fixed_cost_per_kwh)
+                    self._storage.upsert_heat_source_energy(
+                        timestamp=hour_iso,
+                        heat_source_id=hs.id,
+                        component=split.component,
+                        energy_kwh=split.energy_kwh,
+                        cost_sek=cost,
+                        avg_power_w=split.power_w,
+                        spot_price=spot_price,
+                        samples=1,
+                    )
+
+            await self.hass.async_add_executor_job(_store)
 
     async def _backfill_heat_source(self, hs: HeatSourceConfig) -> None:
         """Backfill historical data for a heat source using HA recorder.
@@ -675,70 +715,67 @@ class MySolarCellsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         short_term_start = end_dt - timedelta(days=10)
         long_term_start = end_dt - timedelta(days=5 * 365)
 
+        # Sensors to fetch — always the energy sensor, plus solar sensor when in solar mode
+        energy_sensors = {hs.energy_sensor}
+        solar_sensors = {hs.solar_sensor} if (hs.has_solar and hs.solar_sensor) else set()
+        all_sensors = energy_sensors | solar_sensors
+
         # Fetch 5-minute energy deltas (last ~10 days)
         try:
-            energy_5min = await self.hass.async_add_executor_job(
+            stats_5min = await self.hass.async_add_executor_job(
                 statistics_during_period,
                 self.hass, short_term_start, end_dt,
-                {hs.energy_sensor}, "5minute", None, {"change"},
+                all_sensors, "5minute", None, {"change"},
             )
         except Exception:
             _LOGGER.exception("Failed to query 5-min energy stats for heat source %s", hs.id)
-            energy_5min = {}
+            stats_5min = {}
 
         # Fetch hourly energy deltas (older data, before the 5-min window)
         try:
-            energy_hourly = await self.hass.async_add_executor_job(
+            stats_hourly = await self.hass.async_add_executor_job(
                 statistics_during_period,
                 self.hass, long_term_start, short_term_start,
-                {hs.energy_sensor}, "hour", None, {"change"},
+                all_sensors, "hour", None, {"change"},
             )
         except Exception:
             _LOGGER.exception("Failed to query hourly energy stats for heat source %s", hs.id)
-            energy_hourly = {}
+            stats_hourly = {}
 
-        # Build hour-bucket lookup from hourly stats (implied_power = delta_kwh * 1000)
-        # Each entry: {energy_kwh, implied_power_w, weight} for weighted avg later
-        hour_buckets: dict[str, dict[str, float]] = {}
+        def _build_hour_buckets(sensor: str) -> dict[str, dict[str, float]]:
+            buckets: dict[str, dict[str, float]] = {}
+            for row in stats_hourly.get(sensor, []):
+                change = row.get("change")
+                if change is None or change <= 0:
+                    continue
+                dt = datetime.fromtimestamp(row["start"], tz=timezone.utc)
+                hour_key = dt.strftime("%Y-%m-%dT%H")
+                buckets[hour_key] = {"energy_kwh": change, "implied_power_w": change * 1000}
 
-        for row in energy_hourly.get(hs.energy_sensor, []):
-            change = row.get("change")
-            if change is None or change <= 0:
-                continue
-            dt = datetime.fromtimestamp(row["start"], tz=timezone.utc)
-            hour_key = dt.strftime("%Y-%m-%dT%H")
-            implied_power = change * 1000  # kWh in 1 hour → W
-            hour_buckets[hour_key] = {
-                "energy_kwh": change,
-                "implied_power_w": implied_power,
-            }
+            for row in stats_5min.get(sensor, []):
+                change = row.get("change")
+                if change is None or change <= 0:
+                    continue
+                dt = datetime.fromtimestamp(row["start"], tz=timezone.utc)
+                hour_key = dt.strftime("%Y-%m-%dT%H")
+                implied_power = change / (5 / 60) * 1000
 
-        # Aggregate 5-minute stats into hour buckets
-        for row in energy_5min.get(hs.energy_sensor, []):
-            change = row.get("change")
-            if change is None or change <= 0:
-                continue
-            dt = datetime.fromtimestamp(row["start"], tz=timezone.utc)
-            hour_key = dt.strftime("%Y-%m-%dT%H")
-            implied_power = change / (5 / 60) * 1000  # kWh in 5 min → W
+                if hour_key in buckets:
+                    bucket = buckets[hour_key]
+                    old_energy = bucket["energy_kwh"]
+                    new_total = old_energy + change
+                    if new_total > 0:
+                        bucket["implied_power_w"] = (
+                            bucket["implied_power_w"] * old_energy + implied_power * change
+                        ) / new_total
+                    bucket["energy_kwh"] = new_total
+                else:
+                    buckets[hour_key] = {"energy_kwh": change, "implied_power_w": implied_power}
+            return buckets
 
-            if hour_key in hour_buckets:
-                bucket = hour_buckets[hour_key]
-                # Energy-weighted power average
-                old_energy = bucket["energy_kwh"]
-                new_total_energy = old_energy + change
-                if new_total_energy > 0:
-                    bucket["implied_power_w"] = (
-                        bucket["implied_power_w"] * old_energy + implied_power * change
-                    ) / new_total_energy
-                bucket["energy_kwh"] = new_total_energy
-            else:
-                hour_buckets[hour_key] = {
-                    "energy_kwh": change,
-                    "implied_power_w": implied_power,
-                }
+        hour_buckets = _build_hour_buckets(hs.energy_sensor)
+        solar_buckets = _build_hour_buckets(hs.solar_sensor) if solar_sensors else {}
 
-        # Process each hour bucket and store
         count = 0
 
         def _store_all():
@@ -751,7 +788,6 @@ class MySolarCellsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     continue
 
                 spot_price = self._storage.get_average_price_for_hour(hour_key) or 0.0
-                splits = split_energy_by_power(implied_power, energy_delta, hs)
                 hour_ts = f"{hour_key}:00:00"
 
                 year_str = hour_key[:4]
@@ -760,23 +796,50 @@ class MySolarCellsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         year_str, self._calc_params, self._yearly_params
                     )
                 yp = _year_params_cache[year_str]
-                fixed_cost_per_kwh = yp.transfer_fee + yp.energy_tax
 
-                for split in splits:
-                    if split.energy_kwh <= 0:
-                        continue
-                    cost = split.energy_kwh * (spot_price + fixed_cost_per_kwh)
+                if hs.has_solar:
+                    solar_delta = max(
+                        0.0,
+                        min(solar_buckets.get(hour_key, {}).get("energy_kwh", 0.0), energy_delta),
+                    )
+                    purchased_delta = energy_delta - solar_delta
+                    fixed_per_kwh = yp.transfer_fee + yp.energy_tax
+                    purchased_cost = purchased_delta * (spot_price + fixed_per_kwh)
+                    unit_price_sold = self._storage.get_unit_price_sold_for_hour(hour_key)
+                    if unit_price_sold is None:
+                        unit_price_sold = spot_price
+                    solar_spot_value = solar_delta * unit_price_sold
                     self._storage.upsert_heat_source_energy(
                         timestamp=hour_ts,
                         heat_source_id=hs.id,
-                        component=split.component,
-                        energy_kwh=split.energy_kwh,
-                        cost_sek=cost,
-                        avg_power_w=split.power_w,
+                        component="electric_heater",
+                        energy_kwh=purchased_delta,
+                        cost_sek=purchased_cost,
+                        avg_power_w=implied_power,
                         spot_price=spot_price,
                         samples=1,
+                        solar_energy_kwh=solar_delta,
+                        solar_spot_value_sek=solar_spot_value,
                     )
                     count += 1
+                else:
+                    fixed_cost_per_kwh = yp.transfer_fee + yp.energy_tax
+                    splits = split_energy_by_power(implied_power, energy_delta, hs)
+                    for split in splits:
+                        if split.energy_kwh <= 0:
+                            continue
+                        cost = split.energy_kwh * (spot_price + fixed_cost_per_kwh)
+                        self._storage.upsert_heat_source_energy(
+                            timestamp=hour_ts,
+                            heat_source_id=hs.id,
+                            component=split.component,
+                            energy_kwh=split.energy_kwh,
+                            cost_sek=cost,
+                            avg_power_w=split.power_w,
+                            spot_price=spot_price,
+                            samples=1,
+                        )
+                        count += 1
             self._storage._set_meta(meta_key, datetime.now(tz=timezone.utc).isoformat())
 
         await self.hass.async_add_executor_job(_store_all)

@@ -181,6 +181,11 @@ export interface HeatSourcePeriodStats {
   total_energy_kwh: number;
   total_cost_sek: number;
   components: HeatSourceComponentStats[];
+  has_solar?: boolean;
+  solar_energy_kwh?: number;
+  solar_value_sek?: number;
+  purchased_kwh?: number;
+  purchased_cost_sek?: number;
 }
 
 export interface HeatSourceBreakdown {

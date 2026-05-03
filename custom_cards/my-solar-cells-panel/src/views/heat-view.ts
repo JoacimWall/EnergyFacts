@@ -32,8 +32,9 @@ export class HeatView extends LitElement {
   @state() private _editId = "";
   @state() private _formName = "";
   @state() private _formEnergySensor = "";
-  @state() private _formHasCompressor = true;
+  @state() private _formMode: "standard" | "compressor" | "solar" = "standard";
   @state() private _formThreshold = 700;
+  @state() private _formSolarSensor = "";
   @state() private _saving = false;
   @state() private _successMessage = "";
 
@@ -204,8 +205,9 @@ export class HeatView extends LitElement {
     this._editId = "";
     this._formName = "";
     this._formEnergySensor = "";
-    this._formHasCompressor = true;
+    this._formMode = "standard";
     this._formThreshold = 700;
+    this._formSolarSensor = "";
     this._showForm = true;
   }
 
@@ -215,11 +217,21 @@ export class HeatView extends LitElement {
     this._formEnergySensor = src.energy_sensor;
     try {
       const cfg = JSON.parse(src.config || "{}");
-      this._formHasCompressor = cfg.has_compressor !== false;
+      if (cfg.has_solar) {
+        this._formMode = "solar";
+        this._formSolarSensor = cfg.solar_sensor || "";
+      } else if (cfg.has_compressor !== false) {
+        this._formMode = "compressor";
+        this._formSolarSensor = "";
+      } else {
+        this._formMode = "standard";
+        this._formSolarSensor = "";
+      }
       this._formThreshold = cfg.electric_heater_threshold_w || 700;
     } catch {
-      this._formHasCompressor = true;
+      this._formMode = "standard";
       this._formThreshold = 700;
+      this._formSolarSensor = "";
     }
     this._showForm = true;
   }
@@ -232,19 +244,40 @@ export class HeatView extends LitElement {
     if (!this.hass || !this.entryId || !this._formName) return;
     this._saving = true;
     const id = this._editId || this._formName.toLowerCase().replace(/[^a-z0-9]/g, "_");
-    const components = this._formHasCompressor
-      ? [
-          { id: "heat_pump", name: "Kompressorvärme" },
-          { id: "electric_heater", name: "Immersion heater" },
-        ]
-      : [
-          { id: "electric_heater", name: "Electricity use" },
-        ];
-    const config = JSON.stringify({
-      has_compressor: this._formHasCompressor,
-      components,
-      electric_heater_threshold_w: this._formHasCompressor ? this._formThreshold : 0,
-    });
+
+    let components: { id: string; name: string }[];
+    let configObj: Record<string, unknown>;
+
+    if (this._formMode === "solar") {
+      components = [{ id: "electric_heater", name: "Electricity use" }];
+      configObj = {
+        has_compressor: false,
+        has_solar: true,
+        solar_sensor: this._formSolarSensor,
+        components,
+        electric_heater_threshold_w: 0,
+      };
+    } else if (this._formMode === "compressor") {
+      components = [
+        { id: "heat_pump", name: "Kompressorvärme" },
+        { id: "electric_heater", name: "Immersion heater" },
+      ];
+      configObj = {
+        has_compressor: true,
+        has_solar: false,
+        components,
+        electric_heater_threshold_w: this._formThreshold,
+      };
+    } else {
+      components = [{ id: "electric_heater", name: "Electricity use" }];
+      configObj = {
+        has_compressor: false,
+        has_solar: false,
+        components,
+        electric_heater_threshold_w: 0,
+      };
+    }
+    const config = JSON.stringify(configObj);
     try {
       await this.hass.callWS({
         type: "my_solar_cells/save_heat_source",
@@ -379,29 +412,48 @@ export class HeatView extends LitElement {
             ${t(this.hass, "heat.energyValue", Math.round(Number(src.energy_state)))}
           </div>
         ` : nothing}
-        ${s.total_energy_kwh > 0 ? html`
-          <div class="component-bar">
-            ${s.components.map(
-              (c) => html`<div class="component-bar-segment" style="width: ${c.percentage_of_total}%"></div>`
-            )}
+        ${s.has_solar ? html`
+          <div class="heat-row">
+            <span class="label">${t(this.hass, "heat.solarKwh")}</span>
+            <span class="value">${this._fmtKwh(s.solar_energy_kwh ?? 0)}</span>
           </div>
-        ` : nothing}
-        ${s.components.map(
-          (c) => html`
-            <div class="heat-row">
-              <span class="label">${c.component_name}</span>
-              <span class="value">${this._fmtKwh(c.energy_kwh)} (${this._fmtPct(c.percentage_of_total)})</span>
+          <div class="heat-row">
+            <span class="label">${t(this.hass, "heat.solarValue")}</span>
+            <span class="value">${this._fmtSek(s.solar_value_sek ?? 0)}</span>
+          </div>
+          <div class="heat-row">
+            <span class="label">${t(this.hass, "heat.purchasedKwh")}</span>
+            <span class="value">${this._fmtKwh(s.purchased_kwh ?? 0)}</span>
+          </div>
+          <div class="heat-row">
+            <span class="label">${t(this.hass, "heat.purchasedCost")}</span>
+            <span class="value">${this._fmtSek(s.purchased_cost_sek ?? 0)}</span>
+          </div>
+        ` : html`
+          ${s.total_energy_kwh > 0 ? html`
+            <div class="component-bar">
+              ${s.components.map(
+                (c) => html`<div class="component-bar-segment" style="width: ${c.percentage_of_total}%"></div>`
+              )}
             </div>
-            <div class="heat-row">
-              <span class="label">&nbsp;&nbsp;${t(this.hass, "heat.cost")}</span>
-              <span class="value">${this._fmtSek(c.cost_sek)}</span>
-            </div>
-            <div class="heat-row">
-              <span class="label">&nbsp;&nbsp;${t(this.hass, "heat.avgPower")}</span>
-              <span class="value">${this._fmtW(c.avg_power_w)}</span>
-            </div>
-          `
-        )}
+          ` : nothing}
+          ${s.components.map(
+            (c) => html`
+              <div class="heat-row">
+                <span class="label">${c.component_name}</span>
+                <span class="value">${this._fmtKwh(c.energy_kwh)} (${this._fmtPct(c.percentage_of_total)})</span>
+              </div>
+              <div class="heat-row">
+                <span class="label">&nbsp;&nbsp;${t(this.hass, "heat.cost")}</span>
+                <span class="value">${this._fmtSek(c.cost_sek)}</span>
+              </div>
+              <div class="heat-row">
+                <span class="label">&nbsp;&nbsp;${t(this.hass, "heat.avgPower")}</span>
+                <span class="value">${this._fmtW(c.avg_power_w)}</span>
+              </div>
+            `
+          )}
+        `}
         <hr class="heat-separator" />
         <div class="heat-row heat-summary">
           <span class="label">${t(this.hass, "heat.totalEnergy")}</span>
@@ -441,6 +493,11 @@ export class HeatView extends LitElement {
   }
 
   private _renderForm(): TemplateResult {
+    const modes: Array<{ value: "standard" | "compressor" | "solar"; key: "heat.modeStandard" | "heat.modeCompressor" | "heat.modeSolar" }> = [
+      { value: "standard", key: "heat.modeStandard" },
+      { value: "compressor", key: "heat.modeCompressor" },
+      { value: "solar", key: "heat.modeSolar" },
+    ];
     return html`
       <div class="config-form">
         <div class="input-group">
@@ -452,22 +509,36 @@ export class HeatView extends LitElement {
           />
         </div>
         <div class="input-group">
-          <label>
-            <input
-              type="checkbox"
-              .checked=${this._formHasCompressor}
-              @change=${(e: Event) => { this._formHasCompressor = (e.target as HTMLInputElement).checked; }}
-            />
-            ${t(this.hass, "heat.hasCompressor")}
-          </label>
+          ${modes.map((m) => html`
+            <label style="display:block;margin-bottom:4px">
+              <input
+                type="radio"
+                name="heat-mode"
+                .value=${m.value}
+                .checked=${this._formMode === m.value}
+                @change=${() => { this._formMode = m.value; }}
+              />
+              ${t(this.hass, m.key)}
+            </label>
+          `)}
         </div>
-        ${this._formHasCompressor ? html`
+        ${this._formMode === "compressor" ? html`
           <div class="input-group">
             <label>${t(this.hass, "heat.threshold")} (${t(this.hass, "heat.thresholdUnit")})</label>
             <input
               type="number"
               .value=${String(this._formThreshold)}
               @input=${(e: Event) => { this._formThreshold = parseInt((e.target as HTMLInputElement).value) || 700; }}
+            />
+          </div>
+        ` : nothing}
+        ${this._formMode === "solar" ? html`
+          <div class="input-group">
+            <label>${t(this.hass, "heat.solarSensor")}</label>
+            <input
+              type="text"
+              .value=${this._formSolarSensor}
+              @input=${(e: Event) => { this._formSolarSensor = (e.target as HTMLInputElement).value; }}
             />
           </div>
         ` : nothing}

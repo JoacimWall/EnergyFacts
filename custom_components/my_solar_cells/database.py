@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS heat_source_energy (
     avg_power_w REAL DEFAULT 0,
     spot_price REAL DEFAULT 0,
     samples INTEGER DEFAULT 0,
+    solar_energy_kwh REAL DEFAULT 0,
+    solar_spot_value_sek REAL DEFAULT 0,
     PRIMARY KEY (timestamp, heat_source_id, component),
     FOREIGN KEY (heat_source_id) REFERENCES heat_sources(id)
 );
@@ -114,6 +116,16 @@ class MySolarCellsDatabase:
         self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SCHEMA_SQL)
+        self._conn.commit()
+        self._migrate_sync()
+
+    def _migrate_sync(self) -> None:
+        """Add columns to existing databases that predate the solar feature."""
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(heat_source_energy)").fetchall()}
+        if "solar_energy_kwh" not in cols:
+            self._conn.execute("ALTER TABLE heat_source_energy ADD COLUMN solar_energy_kwh REAL DEFAULT 0")
+        if "solar_spot_value_sek" not in cols:
+            self._conn.execute("ALTER TABLE heat_source_energy ADD COLUMN solar_spot_value_sek REAL DEFAULT 0")
         self._conn.commit()
 
     async def async_close(self) -> None:
@@ -471,11 +483,14 @@ class MySolarCellsDatabase:
         avg_power_w: float,
         spot_price: float,
         samples: int,
+        solar_energy_kwh: float = 0.0,
+        solar_spot_value_sek: float = 0.0,
     ) -> None:
         """Insert or accumulate heat source energy within an hour bucket."""
         assert self._conn is not None
         cur = self._conn.execute(
-            "SELECT energy_kwh, cost_sek, avg_power_w, spot_price, samples "
+            "SELECT energy_kwh, cost_sek, avg_power_w, spot_price, samples, "
+            "solar_energy_kwh, solar_spot_value_sek "
             "FROM heat_source_energy "
             "WHERE timestamp = ? AND heat_source_id = ? AND component = ?",
             (timestamp, heat_source_id, component),
@@ -485,29 +500,32 @@ class MySolarCellsDatabase:
             new_samples = row["samples"] + samples
             new_energy = row["energy_kwh"] + energy_kwh
             new_cost = row["cost_sek"] + cost_sek
-            # Weighted average power
+            new_solar_kwh = (row["solar_energy_kwh"] or 0) + solar_energy_kwh
+            new_solar_spot = (row["solar_spot_value_sek"] or 0) + solar_spot_value_sek
             if new_samples > 0:
                 new_avg_power = (
                     row["avg_power_w"] * row["samples"] + avg_power_w * samples
                 ) / new_samples
             else:
                 new_avg_power = avg_power_w
-            new_spot = spot_price  # Use latest spot price
+            new_spot = spot_price
             self._conn.execute(
                 "UPDATE heat_source_energy SET "
-                "energy_kwh = ?, cost_sek = ?, avg_power_w = ?, spot_price = ?, samples = ? "
+                "energy_kwh = ?, cost_sek = ?, avg_power_w = ?, spot_price = ?, samples = ?, "
+                "solar_energy_kwh = ?, solar_spot_value_sek = ? "
                 "WHERE timestamp = ? AND heat_source_id = ? AND component = ?",
                 (new_energy, new_cost, new_avg_power, new_spot, new_samples,
+                 new_solar_kwh, new_solar_spot,
                  timestamp, heat_source_id, component),
             )
         else:
             self._conn.execute(
                 "INSERT INTO heat_source_energy "
                 "(timestamp, heat_source_id, component, energy_kwh, cost_sek, "
-                "avg_power_w, spot_price, samples) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "avg_power_w, spot_price, samples, solar_energy_kwh, solar_spot_value_sek) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (timestamp, heat_source_id, component, energy_kwh, cost_sek,
-                 avg_power_w, spot_price, samples),
+                 avg_power_w, spot_price, samples, solar_energy_kwh, solar_spot_value_sek),
             )
 
     def delete_heat_source_energy_for_source(self, heat_source_id: str) -> None:
@@ -596,30 +614,45 @@ class MySolarCellsDatabase:
     ) -> dict:
         """Get aggregated heat source energy summary for a period."""
         assert self._conn is not None
+        select = (
+            "SELECT heat_source_id, component, "
+            "COALESCE(SUM(energy_kwh), 0) AS total_energy_kwh, "
+            "COALESCE(SUM(cost_sek), 0) AS total_cost_sek, "
+            "COALESCE(AVG(avg_power_w), 0) AS avg_power_w, "
+            "COALESCE(SUM(solar_energy_kwh), 0) AS total_solar_energy_kwh, "
+            "COALESCE(SUM(solar_spot_value_sek), 0) AS total_solar_spot_value_sek "
+            "FROM heat_source_energy "
+        )
         if heat_source_id:
             cur = self._conn.execute(
-                "SELECT heat_source_id, component, "
-                "COALESCE(SUM(energy_kwh), 0) AS total_energy_kwh, "
-                "COALESCE(SUM(cost_sek), 0) AS total_cost_sek, "
-                "COALESCE(AVG(avg_power_w), 0) AS avg_power_w "
-                "FROM heat_source_energy "
-                "WHERE timestamp >= ? AND timestamp < ? AND heat_source_id = ? "
+                select + "WHERE timestamp >= ? AND timestamp < ? AND heat_source_id = ? "
                 "GROUP BY heat_source_id, component",
                 (start_iso, end_iso, heat_source_id),
             )
         else:
             cur = self._conn.execute(
-                "SELECT heat_source_id, component, "
-                "COALESCE(SUM(energy_kwh), 0) AS total_energy_kwh, "
-                "COALESCE(SUM(cost_sek), 0) AS total_cost_sek, "
-                "COALESCE(AVG(avg_power_w), 0) AS avg_power_w "
-                "FROM heat_source_energy "
-                "WHERE timestamp >= ? AND timestamp < ? "
+                select + "WHERE timestamp >= ? AND timestamp < ? "
                 "GROUP BY heat_source_id, component",
                 (start_iso, end_iso),
             )
         rows = [dict(row) for row in cur.fetchall()]
         return {"components": rows}
+
+    def get_unit_price_sold_for_hour(self, hour_iso: str) -> float | None:
+        """Get unit_price_sold from hourly_energy for an hour.
+
+        hour_iso should be like "2025-06-15T14" (first 13 chars).
+        """
+        assert self._conn is not None
+        prefix = f"{hour_iso[:13]}%"
+        cur = self._conn.execute(
+            "SELECT unit_price_sold FROM hourly_energy WHERE timestamp LIKE ? LIMIT 1",
+            (prefix,),
+        )
+        row = cur.fetchone()
+        if row and row["unit_price_sold"]:
+            return row["unit_price_sold"]
+        return None
 
     @property
     def last_heat_source_readings(self) -> dict:
