@@ -1,4 +1,4 @@
-# My Solar Cells - Home Assistant Integration
+# EnergyFacts - Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
@@ -22,13 +22,13 @@ A Home Assistant custom integration that tracks solar energy production economic
 
 1. Open HACS in Home Assistant
 2. Click the three dots menu -> Custom repositories
-3. Add `https://github.com/joacimwall/ha-my-solar-cells` as an Integration
-4. Search for "My Solar Cells" and install
+3. Add `https://github.com/joacimwall/energyfacts` as an Integration
+4. Search for "EnergyFacts" and install
 5. Restart Home Assistant
 
 ### Manual
 
-1. Copy the `custom_components/my_solar_cells` folder to your `config/custom_components/` directory
+1. Copy the `custom_components/EnergyFacts` folder to your `config/custom_components/` directory
 2. Restart Home Assistant
 
 ## Configuration
