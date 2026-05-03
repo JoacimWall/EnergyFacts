@@ -175,12 +175,27 @@ def calculate_heat_source_period(
             for c in config_parsed.get("components", [])
         }
 
-        purchased_kwh = sum(c["energy_kwh"] for c in comp_data.values())
+        if has_solar and "solar" in comp_data:
+            # New format: solar stored as separate component row (like compressor/heater split)
+            solar_agg = comp_data["solar"]
+            total_solar_kwh = solar_agg["energy_kwh"]
+            total_solar_cost = solar_agg["cost_sek"]
+            purchased_kwh = sum(c["energy_kwh"] for cid, c in comp_data.items() if cid != "solar")
+            purchased_cost = sum(c["cost_sek"] for cid, c in comp_data.items() if cid != "solar")
+        elif has_solar:
+            # Legacy format: solar stored in solar_energy_kwh column of electric_heater row
+            total_solar_kwh = sum(c["solar_energy_kwh"] for c in comp_data.values())
+            total_solar_cost = sum(c["solar_spot_value_sek"] for c in comp_data.values())
+            purchased_kwh = sum(c["energy_kwh"] for c in comp_data.values())
+            purchased_cost = sum(c["cost_sek"] for c in comp_data.values())
+        else:
+            total_solar_kwh = 0.0
+            total_solar_cost = 0.0
+            purchased_kwh = sum(c["energy_kwh"] for c in comp_data.values())
+            purchased_cost = sum(c["cost_sek"] for c in comp_data.values())
+
         total_cost = sum(c["cost_sek"] for c in comp_data.values())
-        total_solar_kwh = sum(c["solar_energy_kwh"] for c in comp_data.values())
-        total_solar_spot_sek = sum(c["solar_spot_value_sek"] for c in comp_data.values())
-        # For solar-mode sources total energy = purchased + solar
-        total_energy = purchased_kwh + (total_solar_kwh if has_solar else 0)
+        total_energy = purchased_kwh + total_solar_kwh
 
         components = []
         for comp_id, agg in comp_data.items():
@@ -203,9 +218,9 @@ def calculate_heat_source_period(
             total_cost_sek=total_cost,
             has_solar=has_solar,
             solar_energy_kwh=total_solar_kwh,
-            solar_spot_value_sek=total_solar_spot_sek,
+            solar_spot_value_sek=total_solar_cost,
             purchased_kwh=purchased_kwh,
-            purchased_cost_sek=total_cost,
+            purchased_cost_sek=purchased_cost,
         ))
 
     return results
@@ -225,6 +240,7 @@ def load_heat_source_config(db_row: dict) -> HeatSourceConfig:
 
     if has_solar:
         default_components = [
+            {"id": "solar", "name": "Solar energy"},
             {"id": "electric_heater", "name": "Electricity use"},
         ]
     elif has_compressor:

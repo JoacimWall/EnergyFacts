@@ -645,12 +645,11 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             fixed_per_kwh = year_params.transfer_fee + year_params.energy_tax
             purchased_cost = purchased_delta * (spot_price + fixed_per_kwh)
 
-            unit_price_sold = self._storage.get_unit_price_sold_for_hour(hour_iso)
-            if unit_price_sold is None:
-                unit_price_sold = spot_price
-            solar_spot_value = solar_delta * unit_price_sold
+            # Solar cost = spot price + grid compensation (same economics as selling to grid)
+            solar_cost = solar_delta * (spot_price + year_params.grid_compensation)
 
             def _store_solar():
+                # Purchased electricity — one component row
                 self._storage.upsert_heat_source_energy(
                     timestamp=hour_iso,
                     heat_source_id=hs.id,
@@ -660,9 +659,19 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     avg_power_w=implied_power_w,
                     spot_price=spot_price,
                     samples=1,
-                    solar_energy_kwh=solar_delta,
-                    solar_spot_value_sek=solar_spot_value,
                 )
+                # Solar energy — separate component row (mirrors compressor/heater split)
+                if solar_delta > 0:
+                    self._storage.upsert_heat_source_energy(
+                        timestamp=hour_iso,
+                        heat_source_id=hs.id,
+                        component="solar",
+                        energy_kwh=solar_delta,
+                        cost_sek=solar_cost,
+                        avg_power_w=implied_power_w,
+                        spot_price=spot_price,
+                        samples=1,
+                    )
 
             await self.hass.async_add_executor_job(_store_solar)
         else:

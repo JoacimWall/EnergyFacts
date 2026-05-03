@@ -217,6 +217,7 @@ export class HourlyHeatView extends LitElement {
     const names: Record<string, string> = {
       electric_heater: isSv ? "Elpatron" : "Direct electric heating",
       heat_pump: isSv ? "Elkompressor" : "Electric compressor",
+      solar: isSv ? "Solenergi" : "Solar energy",
     };
     return names[comp] || comp;
   }
