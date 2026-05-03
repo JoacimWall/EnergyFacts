@@ -58,7 +58,7 @@ class HeatSourcePeriodStats:
     total_cost_sek: float
     has_solar: bool = False
     solar_energy_kwh: float = 0.0
-    solar_spot_value_sek: float = 0.0
+    solar_cost_sek: float = 0.0
     purchased_kwh: float = 0.0
     purchased_cost_sek: float = 0.0
 
@@ -149,16 +149,12 @@ def calculate_heat_source_period(
                 "cost_sek": 0,
                 "power_sum": 0,
                 "count": 0,
-                "solar_energy_kwh": 0,
-                "solar_spot_value_sek": 0,
             }
         agg = by_source[hs_id][comp]
         agg["energy_kwh"] += rec.get("energy_kwh", 0)
         agg["cost_sek"] += rec.get("cost_sek", 0)
         agg["power_sum"] += rec.get("avg_power_w", 0)
         agg["count"] += 1
-        agg["solar_energy_kwh"] += rec.get("solar_energy_kwh", 0)
-        agg["solar_spot_value_sek"] += rec.get("solar_spot_value_sek", 0)
 
     results = []
     for hs_id, comp_data in by_source.items():
@@ -175,19 +171,12 @@ def calculate_heat_source_period(
             for c in config_parsed.get("components", [])
         }
 
-        if has_solar and "solar" in comp_data:
-            # New format: solar stored as separate component row (like compressor/heater split)
-            solar_agg = comp_data["solar"]
-            total_solar_kwh = solar_agg["energy_kwh"]
-            total_solar_cost = solar_agg["cost_sek"]
+        if has_solar:
+            solar_agg = comp_data.get("solar", {})
+            total_solar_kwh = solar_agg.get("energy_kwh", 0.0)
+            total_solar_cost = solar_agg.get("cost_sek", 0.0)
             purchased_kwh = sum(c["energy_kwh"] for cid, c in comp_data.items() if cid != "solar")
             purchased_cost = sum(c["cost_sek"] for cid, c in comp_data.items() if cid != "solar")
-        elif has_solar:
-            # Legacy format: solar stored in solar_energy_kwh column of electric_heater row
-            total_solar_kwh = sum(c["solar_energy_kwh"] for c in comp_data.values())
-            total_solar_cost = sum(c["solar_spot_value_sek"] for c in comp_data.values())
-            purchased_kwh = sum(c["energy_kwh"] for c in comp_data.values())
-            purchased_cost = sum(c["cost_sek"] for c in comp_data.values())
         else:
             total_solar_kwh = 0.0
             total_solar_cost = 0.0
@@ -218,7 +207,7 @@ def calculate_heat_source_period(
             total_cost_sek=total_cost,
             has_solar=has_solar,
             solar_energy_kwh=total_solar_kwh,
-            solar_spot_value_sek=total_solar_cost,
+            solar_cost_sek=total_solar_cost,
             purchased_kwh=purchased_kwh,
             purchased_cost_sek=purchased_cost,
         ))

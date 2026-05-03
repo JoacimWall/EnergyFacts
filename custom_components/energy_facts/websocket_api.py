@@ -667,10 +667,9 @@ async def ws_get_heat_source_breakdown(
             }
 
             if s.has_solar:
-                # solar_spot_value_sek now holds the pre-computed solar cost
-                # (spot_price + grid_compensation per kWh), stored as its own component row
+                # solar_cost_sek = sum of cost_sek from the "solar" component rows
                 entry["solar_energy_kwh"] = round(s.solar_energy_kwh, 4)
-                entry["solar_value_sek"] = round(s.solar_spot_value_sek, 2)
+                entry["solar_value_sek"] = round(s.solar_cost_sek, 2)
                 entry["purchased_kwh"] = round(s.purchased_kwh, 4)
                 entry["purchased_cost_sek"] = round(s.purchased_cost_sek, 2)
 

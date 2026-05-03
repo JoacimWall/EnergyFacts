@@ -814,10 +814,7 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     purchased_delta = energy_delta - solar_delta
                     fixed_per_kwh = yp.transfer_fee + yp.energy_tax
                     purchased_cost = purchased_delta * (spot_price + fixed_per_kwh)
-                    unit_price_sold = self._storage.get_unit_price_sold_for_hour(hour_key)
-                    if unit_price_sold is None:
-                        unit_price_sold = spot_price
-                    solar_spot_value = solar_delta * unit_price_sold
+                    solar_cost = solar_delta * (spot_price + yp.grid_compensation)
                     self._storage.upsert_heat_source_energy(
                         timestamp=hour_ts,
                         heat_source_id=hs.id,
@@ -827,9 +824,18 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         avg_power_w=implied_power,
                         spot_price=spot_price,
                         samples=1,
-                        solar_energy_kwh=solar_delta,
-                        solar_spot_value_sek=solar_spot_value,
                     )
+                    if solar_delta > 0:
+                        self._storage.upsert_heat_source_energy(
+                            timestamp=hour_ts,
+                            heat_source_id=hs.id,
+                            component="solar",
+                            energy_kwh=solar_delta,
+                            cost_sek=solar_cost,
+                            avg_power_w=implied_power,
+                            spot_price=spot_price,
+                            samples=1,
+                        )
                     count += 1
                 else:
                     fixed_cost_per_kwh = yp.transfer_fee + yp.energy_tax
