@@ -7,7 +7,7 @@ via integration tests when installed in Home Assistant.
 
 import pytest
 
-from custom_components.my_solar_cells.const import DOMAIN
+from custom_components.energy_facts.const import DOMAIN
 
 
 # Manually define expected sensor keys since importing sensor.py
@@ -61,7 +61,7 @@ class TestSensorKeys:
 
     def test_domain_is_correct(self):
         """Test the domain constant."""
-        assert DOMAIN == "my_solar_cells"
+        assert DOMAIN == "energy_facts"
 
     def test_daily_keys_count(self):
         """Test daily sensor key count."""

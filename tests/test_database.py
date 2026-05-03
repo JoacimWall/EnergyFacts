@@ -12,7 +12,7 @@ import pytest
 
 # The conftest mocks homeassistant modules, but we need a real hass mock
 # with async_add_executor_job that runs the function synchronously.
-from custom_components.my_solar_cells.database import MySolarCellsDatabase
+from custom_components.energy_facts.database import EnergyFactsDatabase
 
 
 def _make_hass(tmp_dir: str) -> MagicMock:
@@ -32,7 +32,7 @@ def _make_hass(tmp_dir: str) -> MagicMock:
 def db_instance(tmp_path):
     """Create and set up a database instance in a temp directory."""
     hass = _make_hass(str(tmp_path))
-    db = MySolarCellsDatabase(hass, "test_entry")
+    db = EnergyFactsDatabase(hass, "test_entry")
     # Run setup synchronously
     db._setup_sync()
     yield db
@@ -325,17 +325,17 @@ class TestLifecycle:
     def test_setup_creates_db_file(self, tmp_path):
         """async_setup creates the database file."""
         hass = _make_hass(str(tmp_path))
-        db = MySolarCellsDatabase(hass, "lifecycle_test")
+        db = EnergyFactsDatabase(hass, "lifecycle_test")
         db._setup_sync()
 
-        db_path = os.path.join(str(tmp_path), ".storage", "my_solar_cells_lifecycle_test.db")
+        db_path = os.path.join(str(tmp_path), ".storage", "energy_facts_lifecycle_test.db")
         assert os.path.exists(db_path)
         db._close_sync()
 
     def test_remove_deletes_db_file(self, tmp_path):
         """async_remove deletes the database file."""
         hass = _make_hass(str(tmp_path))
-        db = MySolarCellsDatabase(hass, "remove_test")
+        db = EnergyFactsDatabase(hass, "remove_test")
         db._setup_sync()
 
         db_path = db._db_path
@@ -349,7 +349,7 @@ class TestLifecycle:
         hass = _make_hass(str(tmp_path))
 
         # Write data
-        db1 = MySolarCellsDatabase(hass, "persist_test")
+        db1 = EnergyFactsDatabase(hass, "persist_test")
         db1._setup_sync()
         db1.upsert_hourly_record("2024-06-15T12:00:00", _sample_record())
         db1.last_tibber_sync = "2024-06-15T12:00:00"
@@ -357,7 +357,7 @@ class TestLifecycle:
         db1._close_sync()
 
         # Reopen and verify
-        db2 = MySolarCellsDatabase(hass, "persist_test")
+        db2 = EnergyFactsDatabase(hass, "persist_test")
         db2._setup_sync()
         record = db2.get_hourly_record("2024-06-15T12:00:00")
         assert record is not None

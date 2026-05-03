@@ -1,7 +1,7 @@
 # Solar self-consumption flag for heat sources
 
 ## Context
-Today the heat source feature (`custom_components/my_solar_cells/heat_source_engine.py` + the panel "Configuration" view) tracks any energy consumer with one cumulative kWh sensor and an optional `has_compressor` flag that splits energy between heat pump vs immersion heater. The user already added two separate entries — "Laddning bil Totalt" (`sensor.easee_lifetime_energy`) and "Ladning bil Solel" (`sensor.charge_car_sun_energy_total`) — to approximate solar self-consumption for the car charger, but both rows cost the energy at the *purchased* rate, which over-counts cost.
+Today the heat source feature (`custom_components/energy_facts/heat_source_engine.py` + the panel "Configuration" view) tracks any energy consumer with one cumulative kWh sensor and an optional `has_compressor` flag that splits energy between heat pump vs immersion heater. The user already added two separate entries — "Laddning bil Totalt" (`sensor.easee_lifetime_energy`) and "Ladning bil Solel" (`sensor.charge_car_sun_energy_total`) — to approximate solar self-consumption for the car charger, but both rows cost the energy at the *purchased* rate, which over-counts cost.
 
 The user wants a new mode on a heat source: provide both a total energy sensor AND a solar energy sensor, then split each hour into `purchased_kwh = total − solar` (costed as today: `spot + transfer_fee + energy_tax`) and `solar_kwh` (valued exactly like sold solar: `unit_price_sold + grid_compensation + tax_reduction (capped yearly)`).
 
@@ -12,15 +12,15 @@ User-confirmed constraints:
 ## Critical files
 
 Backend (Python):
-- `custom_components/my_solar_cells/database.py` — schema + heat_source CRUD
-- `custom_components/my_solar_cells/heat_source_engine.py` — `HeatSourceConfig`, `load_heat_source_config`, `calculate_heat_source_period`
-- `custom_components/my_solar_cells/coordinator.py` — `_process_heat_source` (lines 560-649), `_backfill_heat_source` (lines 651-784)
-- `custom_components/my_solar_cells/websocket_api.py` — `ws_save_heat_source` (lines 682-722), `ws_get_heat_source_breakdown` (lines 614-679)
+- `custom_components/energy_facts/database.py` — schema + heat_source CRUD
+- `custom_components/energy_facts/heat_source_engine.py` — `HeatSourceConfig`, `load_heat_source_config`, `calculate_heat_source_period`
+- `custom_components/energy_facts/coordinator.py` — `_process_heat_source` (lines 560-649), `_backfill_heat_source` (lines 651-784)
+- `custom_components/energy_facts/websocket_api.py` — `ws_save_heat_source` (lines 682-722), `ws_get_heat_source_breakdown` (lines 614-679)
 
 Frontend (TypeScript / Lit):
-- `custom_cards/my-solar-cells-panel/src/views/heat-view.ts` — form rendering (lines 443-488), save handler (lines 231-266)
-- `custom_cards/my-solar-cells-panel/src/types.ts` — heat source types
-- `custom_cards/my-solar-cells-panel/src/localize.ts` — i18n strings (heat keys at lines 181-213, 420-452)
+- `custom_cards/energy-facts-panel/src/views/heat-view.ts` — form rendering (lines 443-488), save handler (lines 231-266)
+- `custom_cards/energy-facts-panel/src/types.ts` — heat source types
+- `custom_cards/energy-facts-panel/src/localize.ts` — i18n strings (heat keys at lines 181-213, 420-452)
 
 Reused (no edits):
 - `financial_engine.py::get_calc_params_for_year` (line 212) for per-year overrides of `grid_compensation` / `tax_reduction`
@@ -153,11 +153,11 @@ New `TranslationKey`s in both `en` and `sv`: `heat.modeStandard`, `heat.modeComp
 ### Build + version bump
 After editing the panel, rebuild and copy:
 ```
-cd custom_cards/my-solar-cells-panel && npm run build
-cp custom_cards/my-solar-cells-panel/my-solar-cells-panel.js \
-   custom_components/my_solar_cells/my-solar-cells-panel.js
+cd custom_cards/energy-facts-panel && npm run build
+cp custom_cards/energy-facts-panel/energy-facts-panel.js \
+   custom_components/energy_facts/energy-facts-panel.js
 ```
-Bump `version` in `custom_components/my_solar_cells/manifest.json` for cache-busting.
+Bump `version` in `custom_components/energy_facts/manifest.json` for cache-busting.
 
 ## Gotchas
 1. **Solar-sensor reset detection** — same negative-delta guard the energy sensor uses today; skip on negative.
@@ -190,7 +190,7 @@ Run with: `pytest tests/test_heat_source_engine.py tests/test_database_heat_sour
 
 1. Apply the migration on a copy of the live DB:
    ```
-   sqlite3 ~/.homeassistant/.storage/my_solar_cells.db "PRAGMA table_info(heat_source_energy);"
+   sqlite3 ~/.homeassistant/.storage/energy_facts.db "PRAGMA table_info(heat_source_energy);"
    ```
    Confirm `solar_energy_kwh` and `solar_spot_value_sek` appear after first restart.
 

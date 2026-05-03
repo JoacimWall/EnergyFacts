@@ -14,7 +14,7 @@ def _setup_coordinator_module():
     """Import coordinator with a real DataUpdateCoordinator stub.
 
     The conftest mocks DataUpdateCoordinator as a MagicMock, which prevents
-    MySolarCellsCoordinator from being a real class. Here we replace it with
+    EnergyFactsCoordinator from being a real class. Here we replace it with
     a minimal stub so the class body executes normally.
     """
     class _StubDataUpdateCoordinator:
@@ -37,15 +37,15 @@ def _setup_coordinator_module():
     # Ensure the package and its dependencies are loaded first.
     # This populates sys.modules with .const, .storage, etc. so relative
     # imports in coordinator.py don't re-trigger __init__.py.
-    import custom_components.my_solar_cells.const  # noqa: F401
-    import custom_components.my_solar_cells.database  # noqa: F401
-    import custom_components.my_solar_cells.financial_engine  # noqa: F401
-    import custom_components.my_solar_cells.roi_engine  # noqa: F401
-    import custom_components.my_solar_cells.tibber_client  # noqa: F401
+    import custom_components.energy_facts.const  # noqa: F401
+    import custom_components.energy_facts.database  # noqa: F401
+    import custom_components.energy_facts.financial_engine  # noqa: F401
+    import custom_components.energy_facts.roi_engine  # noqa: F401
+    import custom_components.energy_facts.tibber_client  # noqa: F401
 
     # Remove the cached coordinator (which was a MagicMock) and the
     # __init__ module that imported it, so reimport picks up the stub.
-    pkg = "custom_components.my_solar_cells"
+    pkg = "custom_components.energy_facts"
     for mod_name in [f"{pkg}.coordinator", pkg]:
         sys.modules.pop(mod_name, None)
 
@@ -56,9 +56,9 @@ def _setup_coordinator_module():
 
 
 _coord_mod = _setup_coordinator_module()
-MySolarCellsCoordinator = _coord_mod.MySolarCellsCoordinator
+EnergyFactsCoordinator = _coord_mod.EnergyFactsCoordinator
 
-from custom_components.my_solar_cells.financial_engine import CalcParams
+from custom_components.energy_facts.financial_engine import CalcParams
 
 
 def _make_coordinator(
@@ -77,7 +77,7 @@ def _make_coordinator(
         **(sensor_config or {}),
     }
 
-    coord = MySolarCellsCoordinator(hass, session, storage, config, "entry1")
+    coord = EnergyFactsCoordinator(hass, session, storage, config, "entry1")
     return coord
 
 

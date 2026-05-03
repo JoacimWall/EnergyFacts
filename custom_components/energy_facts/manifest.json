@@ -1,0 +1,13 @@
+{
+  "domain": "energy_facts",
+  "name": "EnergyFacts",
+  "version": "1.1.11",
+  "codeowners": ["@joacimwall"],
+  "config_flow": true,
+  "dependencies": ["panel_custom", "recorder"],
+  "documentation": "https://github.com/JoacimWall/EnergyFacts",
+  "issue_tracker": "https://github.com/JoacimWall/EnergyFacts/issues",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "integration_type": "hub"
+}

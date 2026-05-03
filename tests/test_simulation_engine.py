@@ -2,7 +2,7 @@
 
 import pytest
 
-from custom_components.my_solar_cells.simulation_engine import (
+from custom_components.energy_facts.simulation_engine import (
     simulate_battery_add,
     simulate_battery_remove,
 )

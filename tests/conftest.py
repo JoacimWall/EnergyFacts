@@ -1,4 +1,4 @@
-"""Fixtures for My Solar Cells tests."""
+"""Fixtures for EnergyFacts tests."""
 
 from __future__ import annotations
 
@@ -106,7 +106,7 @@ def sample_hourly_records() -> list[dict]:
 @pytest.fixture
 def sample_calc_params():
     """Return sample calculation parameters."""
-    from custom_components.my_solar_cells.financial_engine import CalcParams
+    from custom_components.energy_facts.financial_engine import CalcParams
 
     return CalcParams(
         tax_reduction=0.60,

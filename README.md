@@ -28,7 +28,7 @@ A Home Assistant custom integration that tracks solar energy production economic
 
 ### Manual
 
-1. Copy the `custom_components/EnergyFacts` folder to your `config/custom_components/` directory
+1. Copy the `custom_components/energy_facts` folder to your `config/custom_components/` directory
 2. Restart Home Assistant
 
 ## Configuration
@@ -69,33 +69,33 @@ Enter your solar investment details:
 ## Sensors
 
 ### Daily (reset each day)
-- `sensor.my_solar_cells_daily_production_sold` - kWh sold to grid
-- `sensor.my_solar_cells_daily_production_own_use` - kWh used directly
-- `sensor.my_solar_cells_daily_purchased` - kWh purchased
-- `sensor.my_solar_cells_daily_sold_profit` - SEK earned from selling
-- `sensor.my_solar_cells_daily_own_use_saved` - SEK saved from own use
-- `sensor.my_solar_cells_daily_purchased_cost` - SEK cost of purchased
-- `sensor.my_solar_cells_daily_balance` - SEK net balance
+- `sensor.energy_facts_daily_production_sold` - kWh sold to grid
+- `sensor.energy_facts_daily_production_own_use` - kWh used directly
+- `sensor.energy_facts_daily_purchased` - kWh purchased
+- `sensor.energy_facts_daily_sold_profit` - SEK earned from selling
+- `sensor.energy_facts_daily_own_use_saved` - SEK saved from own use
+- `sensor.energy_facts_daily_purchased_cost` - SEK cost of purchased
+- `sensor.energy_facts_daily_balance` - SEK net balance
 
 ### Monthly
 Same fields as daily plus:
-- `sensor.my_solar_cells_monthly_tax_reduction` - SEK tax reduction
-- `sensor.my_solar_cells_monthly_grid_compensation` - SEK grid compensation
+- `sensor.energy_facts_monthly_tax_reduction` - SEK tax reduction
+- `sensor.energy_facts_monthly_grid_compensation` - SEK grid compensation
 
 ### Yearly
-- `sensor.my_solar_cells_yearly_total_savings` - SEK total savings this year
-- `sensor.my_solar_cells_yearly_return_percentage` - % return on investment
+- `sensor.energy_facts_yearly_total_savings` - SEK total savings this year
+- `sensor.energy_facts_yearly_return_percentage` - % return on investment
 
 ### Lifetime / ROI
-- `sensor.my_solar_cells_total_savings_to_date` - SEK lifetime savings
-- `sensor.my_solar_cells_remaining_on_investment` - SEK remaining
-- `sensor.my_solar_cells_roi_payback_year` - Projected payback year (with 30-year projection as attribute)
-- `sensor.my_solar_cells_investment_amount` - Total investment
+- `sensor.energy_facts_total_savings_to_date` - SEK lifetime savings
+- `sensor.energy_facts_remaining_on_investment` - SEK remaining
+- `sensor.energy_facts_roi_payback_year` - Projected payback year (with 30-year projection as attribute)
+- `sensor.energy_facts_investment_amount` - Total investment
 
 ### Spot Prices
-- `sensor.my_solar_cells_current_spot_price` - Current 15-min spot price (SEK/kWh)
-- `sensor.my_solar_cells_current_price_level` - CHEAP/NORMAL/EXPENSIVE
-- `sensor.my_solar_cells_avg_spot_price_today` - Today's average price
+- `sensor.energy_facts_current_spot_price` - Current 15-min spot price (SEK/kWh)
+- `sensor.energy_facts_current_price_level` - CHEAP/NORMAL/EXPENSIVE
+- `sensor.energy_facts_avg_spot_price_today` - Today's average price
 
 ## Solar Data Panel
 
@@ -134,8 +134,8 @@ Paginated view of raw hourly energy records with date filtering.
 Add the ROI projection card to your dashboard:
 
 ```yaml
-type: custom:my-solar-cells-roi-card
-entity: sensor.my_solar_cells_roi_payback_year
+type: custom:energy-facts-roi-card
+entity: sensor.energy_facts_roi_payback_year
 show_chart: true
 show_table: false
 title: Solar ROI Projection
@@ -148,7 +148,7 @@ title: Solar ROI Projection
 3. **On each update**: Recalculates daily/monthly/yearly financial aggregations and ROI projection
 4. **First run**: Performs historical import from your installation date
 
-The financial calculations match the formulas from the MySolarCells mobile app:
+The financial calculations match the formulas from the EnergyFacts mobile app:
 - Sold profit = spot price per hour * kWh sold + grid compensation + tax reduction
 - Own use savings = spot price * kWh used + transfer fee saved + energy tax saved
 - Tax reduction capped when yearly production sold > purchased
@@ -161,16 +161,16 @@ pip install pytest pytest-asyncio aiohttp
 pytest tests/
 
 # Build the Lovelace ROI card
-cd custom_cards/my-solar-cells-roi-card
+cd custom_cards/energy-facts-roi-card
 npm install
 npm run build
 
 # Build the Solar Data panel
-cd custom_cards/my-solar-cells-panel
+cd custom_cards/energy-facts-panel
 npm install
 npm run build
 # Copy built JS to integration
-cp my-solar-cells-panel.js ../../custom_components/my_solar_cells/
+cp energy-facts-panel.js ../../custom_components/energy_facts/
 ```
 
 ## License

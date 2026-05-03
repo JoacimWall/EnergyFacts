@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.my_solar_cells.heat_source_engine import (
+from custom_components.energy_facts.heat_source_engine import (
     ComponentEnergySplit,
     HeatSourceConfig,
     calculate_heat_source_period,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from custom_components.my_solar_cells.const import DOMAIN
+from custom_components.energy_facts.const import DOMAIN
 
 
 class TestConfigFlow:
@@ -10,21 +10,21 @@ class TestConfigFlow:
 
     def test_config_flow_class_exists(self):
         """Test that config flow class is defined."""
-        from custom_components.my_solar_cells.config_flow import MySolarCellsConfigFlow
+        from custom_components.energy_facts.config_flow import EnergyFactsConfigFlow
 
-        flow = MySolarCellsConfigFlow()
+        flow = EnergyFactsConfigFlow()
         # Flow should be instantiable
         assert flow is not None
 
     def test_config_flow_domain(self):
         """Test config flow is registered for correct domain."""
-        assert DOMAIN == "my_solar_cells"
+        assert DOMAIN == "energy_facts"
 
     def test_options_flow_exists(self):
         """Test that options flow handler is defined."""
-        from custom_components.my_solar_cells.config_flow import MySolarCellsOptionsFlow
+        from custom_components.energy_facts.config_flow import EnergyFactsOptionsFlow
 
-        assert MySolarCellsOptionsFlow is not None
+        assert EnergyFactsOptionsFlow is not None
 
     def test_config_flow_has_5_steps(self):
         """Test that config flow module defines all 5 step methods.
@@ -33,7 +33,7 @@ class TestConfigFlow:
         the module source for the step definitions.
         """
         import inspect
-        from custom_components.my_solar_cells import config_flow
+        from custom_components.energy_facts import config_flow
 
         source = inspect.getsource(config_flow)
         assert "async_step_user" in source
@@ -45,7 +45,7 @@ class TestConfigFlow:
     def test_options_flow_has_yearly_params_steps(self):
         """Test that options flow defines yearly_params step methods."""
         import inspect
-        from custom_components.my_solar_cells import config_flow
+        from custom_components.energy_facts import config_flow
 
         source = inspect.getsource(config_flow)
         assert "async_step_yearly_params" in source
@@ -54,7 +54,7 @@ class TestConfigFlow:
     def test_options_flow_collects_data_across_steps(self):
         """Test that options flow __init__ sets up _collected_data."""
         import inspect
-        from custom_components.my_solar_cells import config_flow
+        from custom_components.energy_facts import config_flow
 
         source = inspect.getsource(config_flow)
         assert "_collected_data" in source

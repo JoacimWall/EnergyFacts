@@ -3,18 +3,18 @@
 import pytest
 from datetime import datetime
 
-from custom_components.my_solar_cells.financial_engine import (
+from custom_components.energy_facts.financial_engine import (
     CalcParams,
     HistoryStats,
     ReportHistoryStats,
     generate_monthly_report,
 )
-from custom_components.my_solar_cells.roi_engine import (
+from custom_components.energy_facts.roi_engine import (
     EstimateRoi,
     calculate_30_year_projection,
     get_average_monthly_production,
 )
-from custom_components.my_solar_cells.const import AVERAGE_PRODUCTION_PER_KW
+from custom_components.energy_facts.const import AVERAGE_PRODUCTION_PER_KW
 
 
 class TestAverageMonthlyProduction:

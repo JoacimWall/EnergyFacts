@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.my_solar_cells.tibber_client import (
+from custom_components.energy_facts.tibber_client import (
     TibberApiError,
     TibberClient,
     _encode_to_base64,

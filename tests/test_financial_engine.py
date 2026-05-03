@@ -2,7 +2,7 @@
 
 import pytest
 
-from custom_components.my_solar_cells.financial_engine import (
+from custom_components.energy_facts.financial_engine import (
     CalcParams,
     HistoryStats,
     calculate_daily_stats,

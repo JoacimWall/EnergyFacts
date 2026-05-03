@@ -9,7 +9,7 @@ import tempfile
 
 import pytest
 
-from custom_components.my_solar_cells.database import MySolarCellsDatabase
+from custom_components.energy_facts.database import EnergyFactsDatabase
 
 
 class FakeConfig:
@@ -37,7 +37,7 @@ class FakeHass:
 def db(tmp_path):
     """Create a test database."""
     hass = FakeHass(str(tmp_path))
-    database = MySolarCellsDatabase(hass, "test_entry")
+    database = EnergyFactsDatabase(hass, "test_entry")
     database._setup_sync()
     yield database
     database._close_sync()
@@ -322,9 +322,9 @@ class TestSolarEnergyColumns:
         conn.commit()
         conn.close()
 
-        # Re-open via MySolarCellsDatabase — _migrate_sync should add columns
+        # Re-open via EnergyFactsDatabase — _migrate_sync should add columns
         hass = FakeHass(str(tmp_path))
-        database = MySolarCellsDatabase.__new__(MySolarCellsDatabase)
+        database = EnergyFactsDatabase.__new__(EnergyFactsDatabase)
         database._hass = hass
         database._entry_id = "legacy"
         database._db_path = db_path
