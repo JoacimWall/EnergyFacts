@@ -14,8 +14,8 @@ jobs:
 
       - name: Create integration zip
         run: |
-          cd custom_components
-          zip -r ../my_solar_cells.zip my_solar_cells/
+          cd custom_components/my_solar_cells
+          zip -r ../../my_solar_cells.zip .
 
       - name: Upload zip to release
         uses: softprops/action-gh-release@v2
