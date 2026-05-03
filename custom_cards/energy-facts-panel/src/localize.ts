@@ -216,7 +216,7 @@ type TranslationKey =
   | "heat.modeSolar"
   | "heat.solarSensor"
   | "heat.solarKwh"
-  | "heat.solarValue"
+  | "heat.solarCost"
   | "heat.purchasedKwh"
   | "heat.purchasedCost"
   // Hourly Heat
@@ -463,7 +463,7 @@ const en: Record<TranslationKey, string> = {
   "heat.modeSolar": "Self-consuming with own solar",
   "heat.solarSensor": "Solar energy sensor (kWh, cumulative)",
   "heat.solarKwh": "Solar energy",
-  "heat.solarValue": "Solar value",
+  "heat.solarCost": "Solar cost",
   "heat.purchasedKwh": "Purchased energy",
   "heat.purchasedCost": "Purchased cost",
   // Hourly Heat
@@ -712,7 +712,7 @@ const sv: Record<TranslationKey, string> = {
   "heat.modeSolar": "Självkonsumtion med eget solel",
   "heat.solarSensor": "Solel-sensor (kWh, kumulativ)",
   "heat.solarKwh": "Solenergi",
-  "heat.solarValue": "Solvärde",
+  "heat.solarCost": "Solkostnad",
   "heat.purchasedKwh": "Köpt energi",
   "heat.purchasedCost": "Köpt kostnad",
   // Hourly Heat

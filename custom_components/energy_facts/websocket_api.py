@@ -667,7 +667,7 @@ async def ws_get_heat_source_breakdown(
             }
 
             if s.has_solar:
-                # Compute solar_value_sek with yearly tax-reduction cap
+                # Solar cost = spot_sold value + grid_compensation (same as selling to grid)
                 src_records = [r for r in records if r["heat_source_id"] == s.heat_source_id]
                 by_year: dict[str, dict] = {}
                 for r in src_records:
@@ -675,24 +675,24 @@ async def ws_get_heat_source_breakdown(
                     if year not in by_year:
                         by_year[year] = {
                             "solar_kwh": 0.0,
-                            "purchased_kwh": 0.0,
                             "solar_spot_sek": 0.0,
                         }
-                    by_year[year]["solar_kwh"] += r.get("solar_energy_kwh") or 0.0
-                    by_year[year]["purchased_kwh"] += r.get("energy_kwh") or 0.0
-                    by_year[year]["solar_spot_sek"] += r.get("solar_spot_value_sek") or 0.0
+                    solar_kwh = r.get("solar_energy_kwh") or 0.0
+                    solar_spot = r.get("solar_spot_value_sek") or 0.0
+                    # Fallback: if spot value wasn't stored, compute from the record's spot_price
+                    if solar_kwh > 0 and solar_spot == 0:
+                        solar_spot = solar_kwh * (r.get("spot_price") or 0.0)
+                    by_year[year]["solar_kwh"] += solar_kwh
+                    by_year[year]["solar_spot_sek"] += solar_spot
 
                 solar_value_total = 0.0
                 for year_str, ydata in by_year.items():
                     yp = get_calc_params_for_year(
                         year_str, coordinator._calc_params, coordinator._yearly_params
                     )
-                    cap = min(ydata["solar_kwh"], ydata["purchased_kwh"])
-                    tax_reduction = cap * yp.tax_reduction
                     solar_value_total += (
                         ydata["solar_spot_sek"]
                         + ydata["solar_kwh"] * yp.grid_compensation
-                        + tax_reduction
                     )
 
                 entry["solar_energy_kwh"] = round(s.solar_energy_kwh, 4)

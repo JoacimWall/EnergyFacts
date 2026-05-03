@@ -418,7 +418,7 @@ export class HeatView extends LitElement {
             <span class="value">${this._fmtKwh(s.solar_energy_kwh ?? 0)}</span>
           </div>
           <div class="heat-row">
-            <span class="label">${t(this.hass, "heat.solarValue")}</span>
+            <span class="label">${t(this.hass, "heat.solarCost")}</span>
             <span class="value">${this._fmtSek(s.solar_value_sek ?? 0)}</span>
           </div>
           <div class="heat-row">
