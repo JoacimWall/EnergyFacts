@@ -413,6 +413,12 @@ export class HeatView extends LitElement {
           </div>
         ` : nothing}
         ${s.has_solar ? html`
+          ${s.total_energy_kwh > 0 ? html`
+            <div class="component-bar">
+              <div class="component-bar-segment" style="width: ${((s.solar_energy_kwh ?? 0) / s.total_energy_kwh * 100)}%"></div>
+              <div class="component-bar-segment" style="width: ${((s.purchased_kwh ?? 0) / s.total_energy_kwh * 100)}%"></div>
+            </div>
+          ` : nothing}
           <div class="heat-row">
             <span class="label">${t(this.hass, "heat.solarKwh")}</span>
             <span class="value">${this._fmtKwh(s.solar_energy_kwh ?? 0)}</span>

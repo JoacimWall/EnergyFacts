@@ -1540,6 +1540,12 @@ const dt=t=>(e,a)=>{void 0!==a?a.addInitializer(()=>{customElements.define(t,e)}
           </div>
         `:z}
         ${t.has_solar?B`
+          ${t.total_energy_kwh>0?B`
+            <div class="component-bar">
+              <div class="component-bar-segment" style="width: ${(t.solar_energy_kwh??0)/t.total_energy_kwh*100}%"></div>
+              <div class="component-bar-segment" style="width: ${(t.purchased_kwh??0)/t.total_energy_kwh*100}%"></div>
+            </div>
+          `:z}
           <div class="heat-row">
             <span class="label">${Dt(this.hass,"heat.solarKwh")}</span>
             <span class="value">${this._fmtKwh(t.solar_energy_kwh??0)}</span>
