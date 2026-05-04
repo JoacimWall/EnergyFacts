@@ -57,6 +57,12 @@ const dt=t=>(e,a)=>{void 0!==a?a.addInitializer(()=>{customElements.define(t,e)}
     color: var(--primary-text-color);
   }
 
+  .version {
+    font-size: 0.75em;
+    color: var(--secondary-text-color);
+    opacity: 0.6;
+  }
+
   .tabs {
     display: flex;
     border-bottom: 1px solid var(--divider-color);
@@ -1757,6 +1763,7 @@ const dt=t=>(e,a)=>{void 0!==a?a.addInitializer(()=>{customElements.define(t,e)}
       <div class="content">
         <div class="header">
           <h1>${Dt(this.hass,"panel.title")}</h1>
+          <span class="version">v${"1.1.15"}</span>
         </div>
         <div class="tabs">
           <button

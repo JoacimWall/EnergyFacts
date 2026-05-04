@@ -21,6 +21,12 @@ export const panelStyles = css`
     color: var(--primary-text-color);
   }
 
+  .version {
+    font-size: 0.75em;
+    color: var(--secondary-text-color);
+    opacity: 0.6;
+  }
+
   .tabs {
     display: flex;
     border-bottom: 1px solid var(--divider-color);

@@ -11,6 +11,8 @@ import "./views/fakta-view";
 import "./views/heat-view";
 import "./views/hourly-heat-view";
 
+const VERSION = "1.1.15";
+
 type TabName = "overview" | "hourly" | "sensors" | "params" | "roi" | "fakta" | "heat" | "hourlyHeat";
 
 @customElement("energy-facts-panel")
@@ -49,6 +51,7 @@ export class EnergyFactsPanel extends LitElement {
       <div class="content">
         <div class="header">
           <h1>${t(this.hass, "panel.title")}</h1>
+          <span class="version">v${VERSION}</span>
         </div>
         <div class="tabs">
           <button
