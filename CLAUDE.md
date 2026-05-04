@@ -43,7 +43,18 @@ cp custom_cards/energy-facts-panel/energy-facts-panel.js custom_components/energ
 ```
 
 ### Version bump for cache-busting
-After changing any JS file (panel or card), bump the version in `custom_components/energy_facts/manifest.json`. The `__init__.py` appends `?v={version}` to JS URLs so browsers fetch the new file instead of serving a cached copy.
+After changing any JS file (panel or card), bump the version in two places:
+1. `custom_components/energy_facts/manifest.json` — `"version"` field
+2. `custom_cards/energy-facts-panel/src/energy-facts-panel.ts` — `const VERSION` constant (displayed in the panel header so users can verify which version is loaded)
+
+The `__init__.py` appends `?v={version}` to JS URLs so browsers fetch the new file instead of serving a cached copy. HA must be restarted after deploy for the new version to take effect.
+
+### Releasing a new version
+1. Bump version in both places above, rebuild, copy JS, commit and push
+2. Create and push a git tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+3. Go to GitHub → Releases → "Draft a new release", select the tag, and **publish** it
+
+The Release GitHub Action (`.github/workflows/release.yml`) triggers on `release: published` — a tag push alone is **not** enough. Publishing the release zips `custom_components/energy_facts/` and attaches it as a release asset for HACS.
 
 ## Architecture
 
