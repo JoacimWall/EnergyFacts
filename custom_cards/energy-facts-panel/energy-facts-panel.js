@@ -1763,7 +1763,7 @@ const dt=t=>(e,a)=>{void 0!==a?a.addInitializer(()=>{customElements.define(t,e)}
       <div class="content">
         <div class="header">
           <h1>${Dt(this.hass,"panel.title")}</h1>
-          <span class="version">v${"1.1.15"}</span>
+          <span class="version">v${"1.1.16"}</span>
         </div>
         <div class="tabs">
           <button
