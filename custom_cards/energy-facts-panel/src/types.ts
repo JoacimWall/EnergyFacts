@@ -192,4 +192,8 @@ export interface HeatSourceBreakdown {
   heat_sources: HeatSourcePeriodStats[];
   total_energy_kwh: number;
   total_cost_sek: number;
+  house_energy_kwh?: number;
+  house_cost_sek?: number;
+  other_energy_kwh?: number;
+  other_cost_sek?: number;
 }

@@ -179,6 +179,10 @@ type TranslationKey =
   // Heat
   | "tab.heat"
   | "heat.title"
+  | "heat.other"
+  | "heat.otherHint"
+  | "heat.houseEnergy"
+  | "heat.houseCost"
   | "heat.noSources"
   | "heat.addSource"
   | "heat.editSource"
@@ -426,6 +430,10 @@ const en: Record<TranslationKey, string> = {
   // Heat
   "tab.heat": "Electricity use",
   "heat.title": "Electricity Use",
+  "heat.other": "Other (household)",
+  "heat.otherHint": "House total minus measured sources",
+  "heat.houseEnergy": "House total energy",
+  "heat.houseCost": "House total cost",
   "heat.noSources": "No heat sources configured. Add one below.",
   "heat.addSource": "Add Heat Source",
   "heat.editSource": "Edit Heat Source",
@@ -452,7 +460,7 @@ const en: Record<TranslationKey, string> = {
   "heat.noData": "No data for this period",
   "heat.sensorStatus": "Sensor status",
   "heat.powerValue": "Power: {0} W",
-  "heat.energyValue": "Energy: {0} kWh",
+  "heat.energyValue": "Meter reading: {0} kWh",
   "heat.saveSuccess": "Heat source saved. Historical data will be imported automatically within ~15 minutes.",
   "heat.hasCompressor": "Has compressor (heat pump)",
   "heat.rebackfill": "Re-import",
@@ -675,6 +683,10 @@ const sv: Record<TranslationKey, string> = {
   // Heat
   "tab.heat": "Elanv\u00e4ndning",
   "heat.title": "Elanv\u00e4ndning",
+  "heat.other": "\u00d6vrigt (hush\u00e5llsel)",
+  "heat.otherHint": "Husets totala minus uppm\u00e4tta k\u00e4llor",
+  "heat.houseEnergy": "Husets totala energi",
+  "heat.houseCost": "Husets totala kostnad",
   "heat.noSources": "Inga v\u00e4rmek\u00e4llor konfigurerade. L\u00e4gg till en nedan.",
   "heat.addSource": "L\u00e4gg till v\u00e4rmek\u00e4lla",
   "heat.editSource": "Redigera v\u00e4rmek\u00e4lla",
@@ -701,7 +713,7 @@ const sv: Record<TranslationKey, string> = {
   "heat.noData": "Ingen data f\u00f6r denna period",
   "heat.sensorStatus": "Sensorstatus",
   "heat.powerValue": "Effekt: {0} W",
-  "heat.energyValue": "Energi: {0} kWh",
+  "heat.energyValue": "M\u00e4tarst\u00e4llning: {0} kWh",
   "heat.saveSuccess": "Värmekälla sparad. Historisk data importeras automatiskt inom ~15 minuter.",
   "heat.hasCompressor": "Har kompressor (värmepump)",
   "heat.rebackfill": "Importera om",

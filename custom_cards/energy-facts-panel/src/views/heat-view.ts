@@ -383,10 +383,37 @@ export class HeatView extends LitElement {
     return html`
       <div class="heat-sources-grid">
         ${d.heat_sources.map((s) => this._renderSourceCard(s))}
+        ${d.house_energy_kwh ? html`
+          <div class="heat-card">
+            <div class="source-header">
+              <h3>${t(this.hass, "heat.other")}</h3>
+            </div>
+            <div class="sensor-status">${t(this.hass, "heat.otherHint")}</div>
+            <div class="heat-row heat-summary">
+              <span class="label">${t(this.hass, "heat.totalEnergy")}</span>
+              <span class="value">${this._fmtKwh(d.other_energy_kwh ?? 0)}</span>
+            </div>
+            <div class="heat-row heat-summary">
+              <span class="label">${t(this.hass, "heat.totalCost")}</span>
+              <span class="value">${this._fmtSek(d.other_cost_sek ?? 0)}</span>
+            </div>
+          </div>
+        ` : nothing}
       </div>
       ${d.heat_sources.length > 1 ? html`
         <div class="heat-card">
           <h3>${t(this.hass, "heat.title")}</h3>
+          ${d.house_energy_kwh ? html`
+            <div class="heat-row heat-summary">
+              <span class="label">${t(this.hass, "heat.houseEnergy")}</span>
+              <span class="value">${this._fmtKwh(d.house_energy_kwh)}</span>
+            </div>
+            <div class="heat-row heat-summary">
+              <span class="label">${t(this.hass, "heat.houseCost")}</span>
+              <span class="value">${this._fmtSek(d.house_cost_sek ?? 0)}</span>
+            </div>
+            <hr class="heat-separator" />
+          ` : nothing}
           <div class="heat-row heat-summary">
             <span class="label">${t(this.hass, "heat.totalEnergy")}</span>
             <span class="value">${this._fmtKwh(d.total_energy_kwh)}</span>

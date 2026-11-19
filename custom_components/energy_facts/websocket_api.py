@@ -675,10 +675,30 @@ async def ws_get_heat_source_breakdown(
 
             result_sources.append(entry)
 
+        # Whole-house consumption = grid purchase + solar own use (+ battery discharge),
+        # priced with the same formula as heat sources so "other" = house - measured.
+        house_energy = 0.0
+        house_cost = 0.0
+        if not hs_id:
+            for r in db.get_records_for_period(start, end):
+                yp = get_calc_params_for_year(
+                    r["timestamp"][:4], coordinator._calc_params, coordinator._yearly_params
+                )
+                spot = r.get("unit_price_buy") or 0.0
+                bought = (r.get("purchased") or 0.0) + (r.get("battery_used") or 0.0)
+                own = r.get("production_own_use") or 0.0
+                house_energy += bought + own
+                house_cost += bought * (spot + yp.transfer_fee + yp.energy_tax)
+                house_cost += own * (spot + yp.grid_compensation)
+
         return {
             "heat_sources": result_sources,
             "total_energy_kwh": round(total_energy, 4),
             "total_cost_sek": round(total_cost, 2),
+            "house_energy_kwh": round(house_energy, 4),
+            "house_cost_sek": round(house_cost, 2),
+            "other_energy_kwh": round(max(0.0, house_energy - total_energy), 4),
+            "other_cost_sek": round(max(0.0, house_cost - total_cost), 2),
         }
 
     try:
