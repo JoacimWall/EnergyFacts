@@ -205,6 +205,7 @@ type TranslationKey =
   | "heat.periodWeek"
   | "heat.periodMonth"
   | "heat.periodYear"
+  | "heat.periodLast12"
   | "heat.todayLabel"
   | "heat.noData"
   | "heat.sensorStatus"
@@ -456,6 +457,7 @@ const en: Record<TranslationKey, string> = {
   "heat.periodWeek": "Week",
   "heat.periodMonth": "Month",
   "heat.periodYear": "Year",
+  "heat.periodLast12": "Last 12 months",
   "heat.todayLabel": "TODAY",
   "heat.noData": "No data for this period",
   "heat.sensorStatus": "Sensor status",
@@ -709,6 +711,7 @@ const sv: Record<TranslationKey, string> = {
   "heat.periodWeek": "Vecka",
   "heat.periodMonth": "M\u00e5nad",
   "heat.periodYear": "\u00c5r",
+  "heat.periodLast12": "Senaste 12 m\u00e5n",
   "heat.todayLabel": "IDAG",
   "heat.noData": "Ingen data f\u00f6r denna period",
   "heat.sensorStatus": "Sensorstatus",

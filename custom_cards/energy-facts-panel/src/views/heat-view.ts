@@ -4,14 +4,15 @@ import { heatStyles } from "../styles";
 import type { HeatSourceConfig, HeatSourceBreakdown, HeatSourcePeriodStats } from "../types";
 import { t, getLocale, monthFull, monthShort } from "../localize";
 
-type PeriodType = "today" | "day" | "week" | "month" | "year";
+type PeriodType = "today" | "day" | "week" | "month" | "year" | "last12";
 
-const PERIOD_KEYS: { type: PeriodType; labelKey: "heat.periodToday" | "heat.periodDay" | "heat.periodWeek" | "heat.periodMonth" | "heat.periodYear" }[] = [
+const PERIOD_KEYS: { type: PeriodType; labelKey: "heat.periodToday" | "heat.periodDay" | "heat.periodWeek" | "heat.periodMonth" | "heat.periodYear" | "heat.periodLast12" }[] = [
   { type: "today", labelKey: "heat.periodToday" },
   { type: "day", labelKey: "heat.periodDay" },
   { type: "week", labelKey: "heat.periodWeek" },
   { type: "month", labelKey: "heat.periodMonth" },
   { type: "year", labelKey: "heat.periodYear" },
+  { type: "last12", labelKey: "heat.periodLast12" },
 ];
 
 @customElement("heat-view")
@@ -84,6 +85,12 @@ export class HeatView extends LitElement {
         end = new Date(d.getFullYear() + 1, 0, 1);
         break;
       }
+      case "last12": {
+        // Rolling 12 months ending with (and including) the selected day
+        end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+        start = new Date(d.getFullYear() - 1, d.getMonth(), d.getDate() + 1);
+        break;
+      }
     }
 
     return {
@@ -123,6 +130,11 @@ export class HeatView extends LitElement {
         return `${monthFull(this.hass, d.getMonth())} ${d.getFullYear()}`;
       case "year":
         return `${d.getFullYear()}`;
+      case "last12": {
+        const from = new Date(d.getFullYear() - 1, d.getMonth(), d.getDate() + 1);
+        const fmt = (x: Date) => `${String(x.getDate()).padStart(2, "0")}/${monthShort(this.hass, x.getMonth())} ${x.getFullYear()}`;
+        return `${fmt(from)} - ${fmt(d)}`;
+      }
     }
   }
 
@@ -136,6 +148,7 @@ export class HeatView extends LitElement {
         d.setDate(d.getDate() + 7 * direction);
         break;
       case "month":
+      case "last12":
         d.setMonth(d.getMonth() + direction);
         break;
       case "year":
