@@ -364,3 +364,23 @@ class TestLifecycle:
         assert record["production_sold"] == 2.0
         assert db2.last_tibber_sync == "2024-06-15T12:00:00"
         db2._close_sync()
+
+
+def test_reset_empty_hours_one_time_sold_repair(db_instance):
+    base = {"synced": True}
+    db_instance.upsert_hourly_record("2026-05-01T00:00:00", {**base, "purchased": 1.0})
+    db_instance.upsert_hourly_record("2026-05-01T01:00:00", {**base})  # 0/0 gap
+    db_instance.upsert_hourly_record(
+        "2026-05-01T12:00:00", {**base, "purchased": 0.5, "production_own_use": 2.0}
+    )  # sun, no export recorded
+
+    assert db_instance.reset_empty_hours() == "2026-05-01T01:00:00"
+    assert not db_instance.get_hourly_record("2026-05-01T12:00:00")["synced"]
+    assert db_instance.get_hourly_record("2026-05-01T00:00:00")["synced"]
+
+    # Second run: only 0/0 gaps are reset, the broad sold repair doesn't repeat
+    db_instance.upsert_hourly_record(
+        "2026-05-01T12:00:00", {**base, "purchased": 0.5, "production_own_use": 2.0}
+    )
+    db_instance.reset_empty_hours()
+    assert db_instance.get_hourly_record("2026-05-01T12:00:00")["synced"]

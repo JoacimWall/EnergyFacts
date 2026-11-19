@@ -718,9 +718,14 @@ class EnergyFactsDatabase:
         Returns the earliest affected timestamp so it can be re-fetched.
         """
         assert self._conn is not None
+        cond = "purchased = 0 AND production_sold = 0"
+        if not self._get_meta("repair_sold_gaps_done"):
+            # One-time: older versions stored null export as 0 even when
+            # consumption was present — re-fetch every sunny hour without export.
+            cond = f"({cond}) OR (production_sold = 0 AND production_own_use > 0)"
+            self._set_meta("repair_sold_gaps_done", "1")
         self._conn.execute(
-            "UPDATE hourly_energy SET synced = 0 "
-            "WHERE synced = 1 AND purchased = 0 AND production_sold = 0"
+            f"UPDATE hourly_energy SET synced = 0 WHERE synced = 1 AND ({cond})"
         )
         row = self._conn.execute(
             "SELECT MIN(timestamp) AS ts FROM hourly_energy WHERE synced = 0"
