@@ -11,7 +11,7 @@ import "./views/fakta-view";
 import "./views/heat-view";
 import "./views/hourly-heat-view";
 
-const VERSION = "1.1.20";
+const VERSION = "1.1.21";
 
 type TabName = "overview" | "hourly" | "sensors" | "params" | "roi" | "fakta" | "heat" | "hourlyHeat";
 

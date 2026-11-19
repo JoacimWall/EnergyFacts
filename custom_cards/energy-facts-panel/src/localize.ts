@@ -180,6 +180,27 @@ type TranslationKey =
   | "tab.heat"
   | "heat.title"
   | "heat.other"
+  | "report.button"
+  | "report.back"
+  | "report.print"
+  | "report.title"
+  | "report.totalEnergy"
+  | "report.totalCost"
+  | "report.avgPrice"
+  | "report.solarShare"
+  | "report.kwhPerMonth"
+  | "report.costPerMonth"
+  | "report.share"
+  | "report.solar"
+  | "report.solarOwnUse"
+  | "report.solarSold"
+  | "report.tableKwh"
+  | "report.tableCost"
+  | "report.consumer"
+  | "report.total"
+  | "report.pricePerKwh"
+  | "report.houseTotal"
+  | "report.footnote"
   | "heat.otherHint"
   | "heat.houseEnergy"
   | "heat.houseCost"
@@ -432,6 +453,27 @@ const en: Record<TranslationKey, string> = {
   "tab.heat": "Electricity use",
   "heat.title": "Electricity Use",
   "heat.other": "Other (household)",
+  "report.button": "Report",
+  "report.back": "Back",
+  "report.print": "Print / PDF",
+  "report.title": "Electricity consumption",
+  "report.totalEnergy": "House total energy",
+  "report.totalCost": "Total cost",
+  "report.avgPrice": "Average price",
+  "report.solarShare": "Share from solar",
+  "report.kwhPerMonth": "Energy per month",
+  "report.costPerMonth": "Cost per month",
+  "report.share": "Share of total energy",
+  "report.solar": "Solar per month",
+  "report.solarOwnUse": "Used in house",
+  "report.solarSold": "Sold",
+  "report.tableKwh": "Energy (kWh)",
+  "report.tableCost": "Cost (SEK)",
+  "report.consumer": "Consumer",
+  "report.total": "Total",
+  "report.pricePerKwh": "SEK/kWh",
+  "report.houseTotal": "House total",
+  "report.footnote": "Cost: purchased electricity = spot price + transfer fee + energy tax; solar = spot price + grid compensation (value if sold). Other = house total minus measured consumers.",
   "heat.otherHint": "House total minus measured sources",
   "heat.houseEnergy": "House total energy",
   "heat.houseCost": "House total cost",
@@ -686,6 +728,27 @@ const sv: Record<TranslationKey, string> = {
   "tab.heat": "Elanv\u00e4ndning",
   "heat.title": "Elanv\u00e4ndning",
   "heat.other": "\u00d6vrigt (hush\u00e5llsel)",
+  "report.button": "Rapport",
+  "report.back": "Tillbaka",
+  "report.print": "Skriv ut / PDF",
+  "report.title": "Elf\u00f6rbrukning",
+  "report.totalEnergy": "Husets totala energi",
+  "report.totalCost": "Total kostnad",
+  "report.avgPrice": "Snittpris",
+  "report.solarShare": "Andel fr\u00e5n sol",
+  "report.kwhPerMonth": "Energi per m\u00e5nad",
+  "report.costPerMonth": "Kostnad per m\u00e5nad",
+  "report.share": "Andel av total energi",
+  "report.solar": "Solel per m\u00e5nad",
+  "report.solarOwnUse": "Anv\u00e4nd i huset",
+  "report.solarSold": "S\u00e5ld",
+  "report.tableKwh": "Energi (kWh)",
+  "report.tableCost": "Kostnad (SEK)",
+  "report.consumer": "F\u00f6rbrukare",
+  "report.total": "Totalt",
+  "report.pricePerKwh": "kr/kWh",
+  "report.houseTotal": "Husets total",
+  "report.footnote": "Kostnad: k\u00f6pt el = spotpris + \u00f6verf\u00f6ringsavgift + energiskatt; solel = spotpris + n\u00e4tnytta (v\u00e4rdet om den s\u00e5lts). \u00d6vrigt = husets total minus uppm\u00e4tta f\u00f6rbrukare.",
   "heat.otherHint": "Husets totala minus uppm\u00e4tta k\u00e4llor",
   "heat.houseEnergy": "Husets totala energi",
   "heat.houseCost": "Husets totala kostnad",

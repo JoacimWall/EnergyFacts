@@ -197,3 +197,9 @@ export interface HeatSourceBreakdown {
   other_energy_kwh?: number;
   other_cost_sek?: number;
 }
+
+export interface HeatSourceMonthly extends HeatSourceBreakdown {
+  month: string; // "YYYY-MM"
+  solar_own_use_kwh: number;
+  solar_sold_kwh: number;
+}

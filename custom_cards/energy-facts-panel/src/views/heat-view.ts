@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { heatStyles } from "../styles";
 import type { HeatSourceConfig, HeatSourceBreakdown, HeatSourcePeriodStats } from "../types";
 import { t, getLocale, monthFull, monthShort } from "../localize";
+import "../components/heat-report";
 
 type PeriodType = "today" | "day" | "week" | "month" | "year" | "last12";
 
@@ -27,6 +28,7 @@ export class HeatView extends LitElement {
   @state() private _loading = false;
   @state() private _initialLoaded = false;
   @state() private _error = "";
+  @state() private _showReport = false;
 
   // Config form state
   @state() private _showForm = false;
@@ -86,9 +88,9 @@ export class HeatView extends LitElement {
         break;
       }
       case "last12": {
-        // Rolling 12 months ending with (and including) the selected day
-        end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-        start = new Date(d.getFullYear() - 1, d.getMonth(), d.getDate() + 1);
+        // 12 whole months, excluding the month of the selected date
+        end = new Date(d.getFullYear(), d.getMonth(), 1);
+        start = new Date(d.getFullYear() - 1, d.getMonth(), 1);
         break;
       }
     }
@@ -97,6 +99,15 @@ export class HeatView extends LitElement {
       start: this._toLocalIso(start!),
       end: this._toLocalIso(end!),
     };
+  }
+
+  /** The 12 "YYYY-MM" months covered by the year / last-12 period. */
+  private _reportMonths(): string[] {
+    const first = new Date(this._getDateRange().start);
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = new Date(first.getFullYear(), first.getMonth() + i, 1);
+      return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
+    });
   }
 
   private _toLocalIso(d: Date): string {
@@ -131,9 +142,10 @@ export class HeatView extends LitElement {
       case "year":
         return `${d.getFullYear()}`;
       case "last12": {
-        const from = new Date(d.getFullYear() - 1, d.getMonth(), d.getDate() + 1);
-        const fmt = (x: Date) => `${String(x.getDate()).padStart(2, "0")}/${monthShort(this.hass, x.getMonth())} ${x.getFullYear()}`;
-        return `${fmt(from)} - ${fmt(d)}`;
+        const from = new Date(d.getFullYear() - 1, d.getMonth(), 1);
+        const to = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+        const fmt = (x: Date) => `${monthShort(this.hass, x.getMonth())} ${x.getFullYear()}`;
+        return `${fmt(from)} – ${fmt(to)}`;
       }
     }
   }
@@ -350,6 +362,17 @@ export class HeatView extends LitElement {
       return html`<div class="no-data">${t(this.hass, "common.error")}: ${this._error}</div>`;
     }
 
+    if (this._showReport) {
+      return html`<heat-report
+        .hass=${this.hass}
+        .entryId=${this.entryId}
+        .months=${this._reportMonths()}
+        .periodLabel=${this._getPeriodLabel()}
+        .sources=${this._sources}
+        @close=${() => { this._showReport = false; }}
+      ></heat-report>`;
+    }
+
     return html`
       ${this._successMessage ? html`<div class="success-message">${this._successMessage}</div>` : nothing}
       ${this._renderPeriodNav()}
@@ -380,6 +403,9 @@ export class HeatView extends LitElement {
               <span class="period-label">${this._getPeriodLabel()}</span>
               <button class="nav-arrow" @click=${() => this._navigate(1)}>&rarr;</button>
             `
+          : nothing}
+        ${this._period === "year" || this._period === "last12"
+          ? html`<button class="heat-btn" @click=${() => { this._showReport = true; }}>${t(this.hass, "report.button")}</button>`
           : nothing}
       </div>
     `;

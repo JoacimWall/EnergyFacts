@@ -59,6 +59,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_simulate_fakta)
     websocket_api.async_register_command(hass, ws_get_heat_sources)
     websocket_api.async_register_command(hass, ws_get_heat_source_breakdown)
+    websocket_api.async_register_command(hass, ws_get_heat_source_monthly)
     websocket_api.async_register_command(hass, ws_save_heat_source)
     websocket_api.async_register_command(hass, ws_delete_heat_source)
     websocket_api.async_register_command(hass, ws_get_hourly_heat)
@@ -612,6 +613,117 @@ async def ws_get_heat_sources(
     connection.send_result(msg["id"], {"heat_sources": sources})
 
 
+def _calc_breakdown(coordinator, start: str, end: str, hs_id: str | None = None) -> dict:
+    """Heat source breakdown + whole-house/other totals for [start, end)."""
+    db = coordinator.storage
+    records = db.get_heat_source_energy_for_period(start, end, hs_id)
+    sources = db.get_heat_sources()
+    period_stats = calculate_heat_source_period(records, sources)
+
+    total_energy = sum(s.total_energy_kwh for s in period_stats)
+    total_cost = sum(s.total_cost_sek for s in period_stats)
+
+    result_sources = []
+    for s in period_stats:
+        entry: dict = {
+            "heat_source_id": s.heat_source_id,
+            "heat_source_name": s.heat_source_name,
+            "total_energy_kwh": round(s.total_energy_kwh, 4),
+            "total_cost_sek": round(s.total_cost_sek, 2),
+            "has_solar": s.has_solar,
+            "components": [
+                {
+                    "component_id": c.component_id,
+                    "component_name": c.component_name,
+                    "energy_kwh": round(c.energy_kwh, 4),
+                    "cost_sek": round(c.cost_sek, 2),
+                    "avg_power_w": round(c.avg_power_w, 1),
+                    "percentage_of_total": round(c.percentage_of_total, 1),
+                }
+                for c in s.components
+            ],
+        }
+
+        if s.has_solar:
+            # solar_cost_sek = sum of cost_sek from the "solar" component rows
+            entry["solar_energy_kwh"] = round(s.solar_energy_kwh, 4)
+            entry["solar_value_sek"] = round(s.solar_cost_sek, 2)
+            entry["purchased_kwh"] = round(s.purchased_kwh, 4)
+            entry["purchased_cost_sek"] = round(s.purchased_cost_sek, 2)
+
+        result_sources.append(entry)
+
+    # Whole-house consumption = grid purchase + solar own use (+ battery discharge),
+    # priced with the same formula as heat sources so "other" = house - measured.
+    house_energy = 0.0
+    house_cost = 0.0
+    if not hs_id:
+        for r in db.get_records_for_period(start, end):
+            yp = get_calc_params_for_year(
+                r["timestamp"][:4], coordinator._calc_params, coordinator._yearly_params
+            )
+            spot = r.get("unit_price_buy") or 0.0
+            bought = (r.get("purchased") or 0.0) + (r.get("battery_used") or 0.0)
+            own = r.get("production_own_use") or 0.0
+            house_energy += bought + own
+            house_cost += bought * (spot + yp.transfer_fee + yp.energy_tax)
+            house_cost += own * (spot + yp.grid_compensation)
+
+    return {
+        "heat_sources": result_sources,
+        "total_energy_kwh": round(total_energy, 4),
+        "total_cost_sek": round(total_cost, 2),
+        "house_energy_kwh": round(house_energy, 4),
+        "house_cost_sek": round(house_cost, 2),
+        "other_energy_kwh": round(max(0.0, house_energy - total_energy), 4),
+        "other_cost_sek": round(max(0.0, house_cost - total_cost), 2),
+    }
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/get_heat_source_monthly",
+        vol.Required("entry_id"): str,
+        vol.Required("months"): [str],
+    }
+)
+@websocket_api.async_response
+async def ws_get_heat_source_monthly(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the breakdown per month (months = 'YYYY-MM' list) plus the period total."""
+    coordinator = _get_coordinator(hass, msg["entry_id"])
+    if coordinator is None:
+        connection.send_error(msg["id"], "not_found", "Entry not found")
+        return
+
+    def _month_bounds(ym: str) -> tuple[str, str]:
+        y, m = int(ym[:4]), int(ym[5:7])
+        ny, nm = (y + 1, 1) if m == 12 else (y, m + 1)
+        return f"{y:04d}-{m:02d}-01T00:00:00", f"{ny:04d}-{nm:02d}-01T00:00:00"
+
+    def _calc():
+        db = coordinator.storage
+        months = []
+        for ym in msg["months"]:
+            start, end = _month_bounds(ym)
+            row = _calc_breakdown(coordinator, start, end)
+            summary = db.get_period_summary(start, end)
+            row["month"] = ym
+            row["solar_own_use_kwh"] = round(summary["own_use_kwh"], 4)
+            row["solar_sold_kwh"] = round(summary["sold_kwh"], 4)
+            months.append(row)
+        return {"months": months}
+
+    try:
+        result = await hass.async_add_executor_job(_calc)
+    except Exception:
+        _LOGGER.exception("Monthly heat source breakdown failed")
+        connection.send_error(msg["id"], "calculation_failed", "Monthly breakdown failed")
+        return
+    connection.send_result(msg["id"], result)
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/get_heat_source_breakdown",
@@ -632,74 +744,12 @@ async def ws_get_heat_source_breakdown(
         connection.send_error(msg["id"], "not_found", "Entry not found")
         return
 
-    db = coordinator.storage
     start = msg["start_date"]
     end = msg["end_date"]
     hs_id = msg.get("heat_source_id")
 
     def _calc():
-        records = db.get_heat_source_energy_for_period(start, end, hs_id)
-        sources = db.get_heat_sources()
-        period_stats = calculate_heat_source_period(records, sources)
-
-        total_energy = sum(s.total_energy_kwh for s in period_stats)
-        total_cost = sum(s.total_cost_sek for s in period_stats)
-
-        result_sources = []
-        for s in period_stats:
-            entry: dict = {
-                "heat_source_id": s.heat_source_id,
-                "heat_source_name": s.heat_source_name,
-                "total_energy_kwh": round(s.total_energy_kwh, 4),
-                "total_cost_sek": round(s.total_cost_sek, 2),
-                "has_solar": s.has_solar,
-                "components": [
-                    {
-                        "component_id": c.component_id,
-                        "component_name": c.component_name,
-                        "energy_kwh": round(c.energy_kwh, 4),
-                        "cost_sek": round(c.cost_sek, 2),
-                        "avg_power_w": round(c.avg_power_w, 1),
-                        "percentage_of_total": round(c.percentage_of_total, 1),
-                    }
-                    for c in s.components
-                ],
-            }
-
-            if s.has_solar:
-                # solar_cost_sek = sum of cost_sek from the "solar" component rows
-                entry["solar_energy_kwh"] = round(s.solar_energy_kwh, 4)
-                entry["solar_value_sek"] = round(s.solar_cost_sek, 2)
-                entry["purchased_kwh"] = round(s.purchased_kwh, 4)
-                entry["purchased_cost_sek"] = round(s.purchased_cost_sek, 2)
-
-            result_sources.append(entry)
-
-        # Whole-house consumption = grid purchase + solar own use (+ battery discharge),
-        # priced with the same formula as heat sources so "other" = house - measured.
-        house_energy = 0.0
-        house_cost = 0.0
-        if not hs_id:
-            for r in db.get_records_for_period(start, end):
-                yp = get_calc_params_for_year(
-                    r["timestamp"][:4], coordinator._calc_params, coordinator._yearly_params
-                )
-                spot = r.get("unit_price_buy") or 0.0
-                bought = (r.get("purchased") or 0.0) + (r.get("battery_used") or 0.0)
-                own = r.get("production_own_use") or 0.0
-                house_energy += bought + own
-                house_cost += bought * (spot + yp.transfer_fee + yp.energy_tax)
-                house_cost += own * (spot + yp.grid_compensation)
-
-        return {
-            "heat_sources": result_sources,
-            "total_energy_kwh": round(total_energy, 4),
-            "total_cost_sek": round(total_cost, 2),
-            "house_energy_kwh": round(house_energy, 4),
-            "house_cost_sek": round(house_cost, 2),
-            "other_energy_kwh": round(max(0.0, house_energy - total_energy), 4),
-            "other_cost_sek": round(max(0.0, house_cost - total_cost), 2),
-        }
+        return _calc_breakdown(coordinator, start, end, hs_id)
 
     try:
         result = await hass.async_add_executor_job(_calc)
