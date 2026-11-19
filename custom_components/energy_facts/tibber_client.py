@@ -245,7 +245,15 @@ class TibberClient:
                 # Sync flag: only mark as synced if 15 min past the hour
                 now_minus_15 = now - timedelta(minutes=15)
                 synced_cutoff = now_minus_15.replace(minute=0, second=0, microsecond=0)
-                is_synced = to_dt <= synced_cutoff
+                # Tibber returns null for hours the grid operator hasn't delivered yet;
+                # leave those unsynced so they are re-fetched later.
+                has_data = node.get("consumption") is not None and (
+                    not prod_by_time or prod_node.get("production") is not None
+                )
+                # After 7 days, accept whatever Tibber has so a permanent gap can't
+                # pin the sync marker and force huge re-fetches every hour.
+                gap_expired = to_dt <= now - timedelta(days=7)
+                is_synced = to_dt <= synced_cutoff and (has_data or gap_expired)
 
                 if import_only_spot_price:
                     consumption_val = 0

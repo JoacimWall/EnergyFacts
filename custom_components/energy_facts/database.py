@@ -711,6 +711,22 @@ class EnergyFactsDatabase:
         records = [dict(row) for row in cur.fetchall()]
         return records, total
 
+    def reset_empty_hours(self) -> str | None:
+        """Mark synced hours with neither purchase nor export as unsynced.
+
+        Such hours are almost always Tibber data gaps (null stored as 0).
+        Returns the earliest affected timestamp so it can be re-fetched.
+        """
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE hourly_energy SET synced = 0 "
+            "WHERE synced = 1 AND purchased = 0 AND production_sold = 0"
+        )
+        row = self._conn.execute(
+            "SELECT MIN(timestamp) AS ts FROM hourly_energy WHERE synced = 0"
+        ).fetchone()
+        return row["ts"] if row else None
+
     def get_unenriched_records(self) -> list[dict]:
         """Get all hourly records that have not been sensor-enriched."""
         assert self._conn is not None

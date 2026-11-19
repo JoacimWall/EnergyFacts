@@ -53,6 +53,14 @@ from .tibber_client import TibberApiError, TibberClient
 _LOGGER = logging.getLogger(__name__)
 
 
+def _sync_marker(records: list[dict]) -> str:
+    """Earliest unsynced timestamp, else the latest one — never skip past a gap."""
+    unsynced = [r["timestamp"] for r in records if r.get("timestamp") and not r.get("synced")]
+    if unsynced:
+        return min(unsynced)
+    return max((r["timestamp"] for r in records if r.get("timestamp")), default="")
+
+
 def _ensure_utc(dt: datetime) -> datetime:
     """Ensure a datetime is timezone-aware (UTC)."""
     if dt.tzinfo is None:
@@ -131,6 +139,7 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             if should_hourly_update:
                 await self._update_consumption_production()
+                await self._backfill_production_own_use()
                 self._last_hourly_update = now
 
             # Backfill historical data for heat sources (once per source)
@@ -176,7 +185,13 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         date to fill gaps.  Otherwise continues from last_tibber_sync.
         """
         configured_start = self._get_configured_start_date()
+        # Re-fetch hours stored as 0/0 (Tibber data gaps) by rewinding the sync marker.
+        # ponytail: rescans from the oldest gap on every restart; fine for a few years of hours.
+        first_gap = await self.hass.async_add_executor_job(self._storage.reset_empty_hours)
         last_sync = self._storage.last_tibber_sync
+        if first_gap and (not last_sync or first_gap < last_sync):
+            last_sync = first_gap
+            self._storage.last_tibber_sync = first_gap
 
         if last_sync:
             sync_dt = _ensure_utc(datetime.fromisoformat(last_sync))
@@ -227,14 +242,9 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._storage.upsert_hourly_record(ts, record)
                 stored_count += 1
 
-            # Only advance sync marker to the latest record timestamp
-            if records:
-                latest_ts = max(
-                    (r.get("timestamp", "") for r in records if r.get("timestamp")),
-                    default="",
-                )
-                if latest_ts:
-                    self._storage.last_tibber_sync = latest_ts
+            marker = _sync_marker(records)
+            if marker:
+                self._storage.last_tibber_sync = marker
 
             await self._storage.async_save()
             _LOGGER.info(
@@ -399,14 +409,9 @@ class EnergyFactsCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     stored["sensor_enriched"] = 1
                     self._storage.upsert_hourly_record(ts, stored)
 
-            # Only advance sync marker to latest record, not to now
-            if records:
-                latest_ts = max(
-                    (r.get("timestamp", "") for r in records if r.get("timestamp")),
-                    default="",
-                )
-                if latest_ts:
-                    self._storage.last_tibber_sync = latest_ts
+            marker = _sync_marker(records)
+            if marker:
+                self._storage.last_tibber_sync = marker
             await self._storage.async_save()
         except TibberApiError as err:
             _LOGGER.warning("Failed to update consumption/production: %s", err)

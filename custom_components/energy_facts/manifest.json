@@ -1,7 +1,7 @@
 {
   "domain": "energy_facts",
   "name": "EnergyFacts",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "codeowners": ["@joacimwall"],
   "config_flow": true,
   "dependencies": ["panel_custom", "recorder"],
