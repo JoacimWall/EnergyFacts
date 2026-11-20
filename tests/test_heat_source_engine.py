@@ -302,52 +302,36 @@ class TestCalculateHeatSourcePeriodWithSolar:
         ]
 
     def test_solar_aggregation_sums_solar_kwh_and_value(self):
-        """Solar kWh and spot value are summed correctly across records."""
+        """Solar component rows are summed into solar kWh and value."""
         records = [
-            {
-                "heat_source_id": "car1",
-                "component": "electric_heater",
-                "energy_kwh": 1.0,
-                "cost_sek": 0.50,
-                "avg_power_w": 400.0,
-                "solar_energy_kwh": 0.5,
-                "solar_spot_value_sek": 0.25,
-            },
-            {
-                "heat_source_id": "car1",
-                "component": "electric_heater",
-                "energy_kwh": 2.0,
-                "cost_sek": 1.00,
-                "avg_power_w": 600.0,
-                "solar_energy_kwh": 1.0,
-                "solar_spot_value_sek": 0.50,
-            },
+            {"heat_source_id": "car1", "component": "electric_heater",
+             "energy_kwh": 1.0, "cost_sek": 0.50, "avg_power_w": 400.0},
+            {"heat_source_id": "car1", "component": "solar",
+             "energy_kwh": 0.5, "cost_sek": 0.25, "avg_power_w": 400.0},
+            {"heat_source_id": "car1", "component": "solar",
+             "energy_kwh": 1.0, "cost_sek": 0.50, "avg_power_w": 600.0},
         ]
         result = calculate_heat_source_period(records, self._make_sources())
         assert len(result) == 1
         s = result[0]
         assert s.has_solar is True
         assert s.solar_energy_kwh == pytest.approx(1.5)
-        assert s.solar_spot_value_sek == pytest.approx(0.75)
+        assert s.solar_cost_sek == pytest.approx(0.75)
 
     def test_purchased_kwh_equals_energy_minus_solar(self):
-        """purchased_kwh = sum(energy_kwh), total_energy = purchased + solar."""
+        """purchased = non-solar rows, total_energy = purchased + solar."""
         records = [
-            {
-                "heat_source_id": "car1",
-                "component": "electric_heater",
-                "energy_kwh": 3.0,
-                "cost_sek": 1.50,
-                "avg_power_w": 500.0,
-                "solar_energy_kwh": 1.0,
-                "solar_spot_value_sek": 0.40,
-            },
+            {"heat_source_id": "car1", "component": "electric_heater",
+             "energy_kwh": 3.0, "cost_sek": 1.50, "avg_power_w": 500.0},
+            {"heat_source_id": "car1", "component": "solar",
+             "energy_kwh": 1.0, "cost_sek": 0.40, "avg_power_w": 500.0},
         ]
         result = calculate_heat_source_period(records, self._make_sources())
         s = result[0]
         assert s.purchased_kwh == pytest.approx(3.0)
-        assert s.total_energy_kwh == pytest.approx(4.0)  # 3 purchased + 1 solar
+        assert s.total_energy_kwh == pytest.approx(4.0)
         assert s.purchased_cost_sek == pytest.approx(1.50)
+        assert s.total_cost_sek == pytest.approx(1.90)
 
     def test_non_solar_source_has_zero_solar_fields(self):
         """Non-solar sources default to zero solar fields."""
@@ -366,5 +350,5 @@ class TestCalculateHeatSourcePeriodWithSolar:
         s = result[0]
         assert s.has_solar is False
         assert s.solar_energy_kwh == pytest.approx(0.0)
-        assert s.solar_spot_value_sek == pytest.approx(0.0)
+        assert s.solar_cost_sek == pytest.approx(0.0)
         assert s.total_energy_kwh == pytest.approx(2.0)

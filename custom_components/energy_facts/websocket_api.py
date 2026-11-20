@@ -31,7 +31,7 @@ from .const import (
     DOMAIN,
 )
 from .financial_engine import CalcParams, calculate_period, generate_monthly_report, get_calc_params_for_year
-from .heat_source_engine import calculate_heat_source_period
+from .heat_source_engine import calculate_heat_source_period, reprice_by_solar_share
 from .roi_engine import calculate_30_year_projection
 from .simulation_engine import simulate_battery_add, simulate_battery_remove
 
@@ -613,11 +613,48 @@ async def ws_get_heat_sources(
     connection.send_result(msg["id"], {"heat_sources": sources})
 
 
+def _house_hour(coordinator, r: dict) -> tuple[float, float, float, float]:
+    """(bought kWh, own solar kWh, buy price, solar price) for one hourly_energy row."""
+    yp = get_calc_params_for_year(r["timestamp"][:4], coordinator._calc_params, coordinator._yearly_params)
+    spot = r.get("unit_price_buy") or 0.0
+    bought = (r.get("purchased") or 0.0) + (r.get("battery_used") or 0.0)
+    own = r.get("production_own_use") or 0.0
+    return bought, own, spot + yp.transfer_fee + yp.energy_tax, spot + yp.grid_compensation
+
+
 def _calc_breakdown(coordinator, start: str, end: str, hs_id: str | None = None) -> dict:
     """Heat source breakdown + whole-house/other totals for [start, end)."""
     db = coordinator.storage
-    records = db.get_heat_source_energy_for_period(start, end, hs_id)
     sources = db.get_heat_sources()
+    records = db.get_heat_source_energy_for_period(start, end)
+
+    # Whole-house consumption = grid purchase + solar own use (+ battery discharge).
+    # Per hour: bought kWh at full buy price, own solar at spot + grid compensation.
+    house_energy = 0.0
+    house_cost = 0.0
+    bought_kwh = 0.0
+    bought_cost = 0.0
+    own_kwh = 0.0
+    own_avoided = 0.0  # what the self-used solar would have cost to buy
+    own_alt_income = 0.0  # what it would have earned if sold instead
+    hours: dict[str, tuple[float, float, float, float]] = {}  # hour -> (bought, own, buy_price, solar_price)
+    for r in db.get_records_for_period(start, end):
+        year = r["timestamp"][:4]
+        yp = get_calc_params_for_year(year, coordinator._calc_params, coordinator._yearly_params)
+        # ponytail: no yearly skattereduktion cap (sold <= purchased), add if a home sells more than it buys
+        tax_red = yp.tax_reduction  # already 0 from 2026 (get_calc_params_for_year)
+        bought, own, buy_price, solar_price = hours[r["timestamp"][:13]] = _house_hour(coordinator, r)
+        house_energy += bought + own
+        house_cost += bought * buy_price + own * solar_price
+        bought_kwh += bought
+        bought_cost += bought * buy_price
+        own_kwh += own
+        own_avoided += own * buy_price
+        own_alt_income += own * ((r.get("unit_price_sold") or 0.0) + yp.grid_compensation + tax_red)
+
+    reprice_by_solar_share(records, sources, hours)
+    if hs_id:
+        records = [r for r in records if r["heat_source_id"] == hs_id]
     period_stats = calculate_heat_source_period(records, sources)
 
     total_energy = sum(s.total_energy_kwh for s in period_stats)
@@ -653,33 +690,9 @@ def _calc_breakdown(coordinator, start: str, end: str, hs_id: str | None = None)
 
         result_sources.append(entry)
 
-    # Whole-house consumption = grid purchase + solar own use (+ battery discharge),
-    # priced with the same formula as heat sources so "other" = house - measured.
-    house_energy = 0.0
-    house_cost = 0.0
-    bought_kwh = 0.0
-    bought_cost = 0.0
-    own_kwh = 0.0
-    own_avoided = 0.0  # what the self-used solar would have cost to buy
-    own_alt_income = 0.0  # what it would have earned if sold instead
-    if not hs_id:
-        for r in db.get_records_for_period(start, end):
-            year = r["timestamp"][:4]
-            yp = get_calc_params_for_year(year, coordinator._calc_params, coordinator._yearly_params)
-            # ponytail: no yearly skattereduktion cap (sold <= purchased), add if a home sells more than it buys
-            tax_red = yp.tax_reduction  # already 0 from 2026 (get_calc_params_for_year)
-            spot = r.get("unit_price_buy") or 0.0
-            bought = (r.get("purchased") or 0.0) + (r.get("battery_used") or 0.0)
-            own = r.get("production_own_use") or 0.0
-            buy_price = spot + yp.transfer_fee + yp.energy_tax
-            house_energy += bought + own
-            house_cost += bought * buy_price
-            house_cost += own * (spot + yp.grid_compensation)
-            bought_kwh += bought
-            bought_cost += bought * buy_price
-            own_kwh += own
-            own_avoided += own * buy_price
-            own_alt_income += own * ((r.get("unit_price_sold") or 0.0) + yp.grid_compensation + tax_red)
+    if hs_id:  # house totals only make sense for the full breakdown
+        house_energy = house_cost = bought_kwh = bought_cost = 0.0
+        own_kwh = own_avoided = own_alt_income = 0.0
 
     return {
         "heat_sources": result_sources,
@@ -907,11 +920,11 @@ async def ws_get_hourly_heat(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
     """Return paginated hourly heat source energy records."""
-    entry_id = msg["entry_id"]
-    db = _get_database(hass, entry_id)
-    if db is None:
+    coordinator = _get_coordinator(hass, msg["entry_id"])
+    if coordinator is None:
         connection.send_error(msg["id"], "not_found", "Entry not found")
         return
+    db = coordinator.storage
 
     start = msg["start_date"]
     end = msg["end_date"]
@@ -923,6 +936,19 @@ async def ws_get_hourly_heat(
         records, total = db.get_heat_source_energy_paginated(
             start, end, offset, limit, hs_id
         )
+        if records:
+            # Reprice the page with each hour's grid/solar mix (same as the breakdown)
+            first = min(r["timestamp"] for r in records)[:13] + ":00:00"
+            last = max(r["timestamp"] for r in records)[:13] + ":59:59"
+            hours = {
+                h["timestamp"][:13]: _house_hour(coordinator, h)
+                for h in db.get_records_for_period(first, last)
+            }
+            all_recs = db.get_heat_source_energy_for_period(first, last)
+            reprice_by_solar_share(all_recs, db.get_heat_sources(), hours)
+            cost = {(r["timestamp"], r["heat_source_id"], r["component"]): r["cost_sek"] for r in all_recs}
+            for r in records:
+                r["cost_sek"] = cost.get((r["timestamp"], r["heat_source_id"], r["component"]), r["cost_sek"])
         return {"records": records, "total_count": total}
 
     result = await hass.async_add_executor_job(_fetch)

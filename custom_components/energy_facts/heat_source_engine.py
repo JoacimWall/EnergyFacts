@@ -255,3 +255,45 @@ def load_heat_source_config(db_row: dict) -> HeatSourceConfig:
             "electric_heater_threshold_w", DEFAULT_ELPATRON_THRESHOLD_W
         ) if has_compressor else 0,
     )
+
+
+def reprice_by_solar_share(
+    records: list[dict],
+    heat_sources: list[dict],
+    hours: dict[str, tuple[float, float, float, float]],
+) -> None:
+    """Reprice sub-meter records in place with each hour's grid/solar mix.
+
+    hours: "YYYY-MM-DDTHH" -> (bought_kwh, own_solar_kwh, buy_price, solar_price).
+    Sources with their own solar sensor (has_solar) keep their measured split; the
+    house's remaining bought/solar kWh that hour give a blended price applied to
+    every other sub-meter, so the solar discount is shared by all loads instead of
+    landing entirely in "other". Hours without house data keep their stored cost.
+    """
+    own_split = set()
+    for hs in heat_sources:
+        cfg = hs.get("config", "{}")
+        try:
+            cfg = json.loads(cfg) if isinstance(cfg, str) else cfg
+        except (json.JSONDecodeError, TypeError):
+            cfg = {}
+        if cfg.get("has_solar"):
+            own_split.add(hs["id"])
+
+    # Take the solar sources' measured kWh out of the house pool first
+    pool: dict[str, list[float]] = {}
+    for rec in records:
+        h = rec["timestamp"][:13]
+        if rec["heat_source_id"] in own_split and h in hours:
+            bought, own, _, _ = hours[h]
+            p = pool.setdefault(h, [bought, own])
+            p[1 if rec["component"] == "solar" else 0] -= rec.get("energy_kwh", 0.0)
+
+    for rec in records:
+        h = rec["timestamp"][:13]
+        if rec["heat_source_id"] in own_split or h not in hours:
+            continue
+        bought, own, buy_price, solar_price = hours[h]
+        bought, own = (max(0.0, x) for x in pool.get(h, (bought, own)))
+        price = (bought * buy_price + own * solar_price) / (bought + own) if bought + own > 0 else buy_price
+        rec["cost_sek"] = rec.get("energy_kwh", 0.0) * price
