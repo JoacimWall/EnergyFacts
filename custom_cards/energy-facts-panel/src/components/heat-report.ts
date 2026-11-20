@@ -76,8 +76,14 @@ export class HeatReport extends LitElement {
     }
   `;
 
-  updated(changed: Map<string, unknown>) {
-    if ((changed.has("months") || changed.has("entryId")) && this.hass && this.months.length) {
+  private _fetchedKey = "";
+
+  updated() {
+    // The parent re-renders on every hass update and passes a new months array,
+    // so compare contents — not identity — to avoid a re-fetch loop.
+    const key = `${this.entryId}|${this.months.join(",")}`;
+    if (this.hass && this.months.length && key !== this._fetchedKey) {
+      this._fetchedKey = key;
       this._fetch();
     }
   }
