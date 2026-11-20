@@ -657,17 +657,29 @@ def _calc_breakdown(coordinator, start: str, end: str, hs_id: str | None = None)
     # priced with the same formula as heat sources so "other" = house - measured.
     house_energy = 0.0
     house_cost = 0.0
+    bought_kwh = 0.0
+    bought_cost = 0.0
+    own_kwh = 0.0
+    own_avoided = 0.0  # what the self-used solar would have cost to buy
+    own_alt_income = 0.0  # what it would have earned if sold instead
     if not hs_id:
         for r in db.get_records_for_period(start, end):
-            yp = get_calc_params_for_year(
-                r["timestamp"][:4], coordinator._calc_params, coordinator._yearly_params
-            )
+            year = r["timestamp"][:4]
+            yp = get_calc_params_for_year(year, coordinator._calc_params, coordinator._yearly_params)
+            # ponytail: no yearly skattereduktion cap (sold <= purchased), add if a home sells more than it buys
+            tax_red = yp.tax_reduction  # already 0 from 2026 (get_calc_params_for_year)
             spot = r.get("unit_price_buy") or 0.0
             bought = (r.get("purchased") or 0.0) + (r.get("battery_used") or 0.0)
             own = r.get("production_own_use") or 0.0
+            buy_price = spot + yp.transfer_fee + yp.energy_tax
             house_energy += bought + own
-            house_cost += bought * (spot + yp.transfer_fee + yp.energy_tax)
+            house_cost += bought * buy_price
             house_cost += own * (spot + yp.grid_compensation)
+            bought_kwh += bought
+            bought_cost += bought * buy_price
+            own_kwh += own
+            own_avoided += own * buy_price
+            own_alt_income += own * ((r.get("unit_price_sold") or 0.0) + yp.grid_compensation + tax_red)
 
     return {
         "heat_sources": result_sources,
@@ -677,6 +689,11 @@ def _calc_breakdown(coordinator, start: str, end: str, hs_id: str | None = None)
         "house_cost_sek": round(house_cost, 2),
         "other_energy_kwh": round(max(0.0, house_energy - total_energy), 4),
         "other_cost_sek": round(max(0.0, house_cost - total_cost), 2),
+        "purchased_kwh": round(bought_kwh, 4),
+        "purchased_cost_sek": round(bought_cost, 2),
+        "own_use_kwh": round(own_kwh, 4),
+        "own_use_avoided_sek": round(own_avoided, 2),
+        "own_use_alt_income_sek": round(own_alt_income, 2),
     }
 
 

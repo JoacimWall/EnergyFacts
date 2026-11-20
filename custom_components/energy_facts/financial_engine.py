@@ -7,6 +7,8 @@ from copy import copy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from .const import TAX_REDUCTION_END_YEAR
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -220,6 +222,20 @@ def get_calc_params_for_year(
     recent prior year's overrides. Falls back to base_params only when no
     prior year entry exists.
     """
+    params = _lookup_year_params(year, base_params, yearly_params)
+    # Skattereduktion for sold electricity was abolished from 2026-01-01,
+    # whatever is stored in yearly params.
+    if int(year) >= TAX_REDUCTION_END_YEAR and params.tax_reduction:
+        params = copy(params)
+        params.tax_reduction = 0.0
+    return params
+
+
+def _lookup_year_params(
+    year: str,
+    base_params: CalcParams,
+    yearly_params: dict[str, dict[str, float]] | None,
+) -> CalcParams:
     if not yearly_params:
         return base_params
 

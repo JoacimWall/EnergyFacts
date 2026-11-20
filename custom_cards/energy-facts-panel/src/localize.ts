@@ -180,6 +180,14 @@ type TranslationKey =
   | "tab.heat"
   | "heat.title"
   | "heat.other"
+  | "report.purchasedEnergy"
+  | "report.ownSolarEnergy"
+  | "report.ofConsumption"
+  | "report.purchasedCost"
+  | "report.ownSolarValue"
+  | "report.ownSolarValueSub"
+  | "report.saving"
+  | "report.savingSub"
   | "report.button"
   | "report.back"
   | "report.print"
@@ -453,6 +461,14 @@ const en: Record<TranslationKey, string> = {
   "tab.heat": "Electricity use",
   "heat.title": "Electricity Use",
   "heat.other": "Other (household)",
+  "report.purchasedEnergy": "Purchased from grid",
+  "report.ownSolarEnergy": "Own solar used",
+  "report.ofConsumption": "of consumption",
+  "report.purchasedCost": "Purchased electricity",
+  "report.ownSolarValue": "Value of own solar",
+  "report.ownSolarValueSub": "cost if it had been bought",
+  "report.saving": "Saved vs selling",
+  "report.savingSub": "better than selling",
   "report.button": "Report",
   "report.back": "Back",
   "report.print": "Print / PDF",
@@ -473,7 +489,7 @@ const en: Record<TranslationKey, string> = {
   "report.total": "Total",
   "report.pricePerKwh": "SEK/kWh",
   "report.houseTotal": "House total",
-  "report.footnote": "Cost: purchased electricity = spot price + transfer fee + energy tax; solar = spot price + grid compensation (value if sold). Other = house total minus measured consumers.",
+  "report.footnote": "Cost: purchased electricity = spot price + transfer fee + energy tax; solar = spot price + grid compensation (value if sold). Other = house total minus measured consumers. Saved vs selling = cost avoided by using own solar minus what it would have earned sold (spot + grid compensation, + tax reduction before 2026).",
   "heat.otherHint": "House total minus measured sources",
   "heat.houseEnergy": "House total energy",
   "heat.houseCost": "House total cost",
@@ -728,6 +744,14 @@ const sv: Record<TranslationKey, string> = {
   "tab.heat": "Elanv\u00e4ndning",
   "heat.title": "Elanv\u00e4ndning",
   "heat.other": "\u00d6vrigt (hush\u00e5llsel)",
+  "report.purchasedEnergy": "K\u00f6pt fr\u00e5n n\u00e4tet",
+  "report.ownSolarEnergy": "Egen solel anv\u00e4nd",
+  "report.ofConsumption": "av f\u00f6rbrukningen",
+  "report.purchasedCost": "K\u00f6pt el",
+  "report.ownSolarValue": "V\u00e4rde av egen solel",
+  "report.ownSolarValueSub": "kostnad om den hade k\u00f6pts",
+  "report.saving": "Sparat j\u00e4mf\u00f6rt med att s\u00e4lja",
+  "report.savingSub": "b\u00e4ttre \u00e4n att s\u00e4lja",
   "report.button": "Rapport",
   "report.back": "Tillbaka",
   "report.print": "Skriv ut / PDF",
@@ -748,7 +772,7 @@ const sv: Record<TranslationKey, string> = {
   "report.total": "Totalt",
   "report.pricePerKwh": "kr/kWh",
   "report.houseTotal": "Husets total",
-  "report.footnote": "Kostnad: k\u00f6pt el = spotpris + \u00f6verf\u00f6ringsavgift + energiskatt; solel = spotpris + n\u00e4tnytta (v\u00e4rdet om den s\u00e5lts). \u00d6vrigt = husets total minus uppm\u00e4tta f\u00f6rbrukare.",
+  "report.footnote": "Kostnad: k\u00f6pt el = spotpris + \u00f6verf\u00f6ringsavgift + energiskatt; solel = spotpris + n\u00e4tnytta (v\u00e4rdet om den s\u00e5lts). \u00d6vrigt = husets total minus uppm\u00e4tta f\u00f6rbrukare. Sparat j\u00e4mf\u00f6rt med att s\u00e4lja = undviken k\u00f6pkostnad f\u00f6r egen solel minus vad den hade gett s\u00e5ld (spot + n\u00e4tnytta, + skattereduktion f\u00f6re 2026).",
   "heat.otherHint": "Husets totala minus uppm\u00e4tta k\u00e4llor",
   "heat.houseEnergy": "Husets totala energi",
   "heat.houseCost": "Husets totala kostnad",

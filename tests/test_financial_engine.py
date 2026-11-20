@@ -420,3 +420,14 @@ class TestYearAwareCalculations:
         # 2024: 3.0 * 0.09 = 0.27
         # Total: 0.48
         assert result.production_sold_grid_compensation_profit == 0.48
+
+
+def test_tax_reduction_locked_to_zero_from_2026():
+    from custom_components.energy_facts.financial_engine import CalcParams, get_calc_params_for_year
+
+    base = CalcParams(tax_reduction=0.6)
+    stored = {"2025": {"tax_reduction": 0.6}, "2026": {"tax_reduction": 0.6}}
+    assert get_calc_params_for_year("2025", base, stored).tax_reduction == 0.6
+    assert get_calc_params_for_year("2026", base, stored).tax_reduction == 0.0
+    assert get_calc_params_for_year("2027", base, None).tax_reduction == 0.0
+    assert base.tax_reduction == 0.6  # base not mutated

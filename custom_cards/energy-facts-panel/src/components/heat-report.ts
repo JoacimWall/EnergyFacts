@@ -50,6 +50,8 @@ export class HeatReport extends LitElement {
     .kpi { background: var(--card-background-color, #f5f5f5); border-radius: 10px; padding: 12px 16px; border: 1px solid var(--divider-color, #e0e0e0); }
     .kpi .label { font-size: 0.8em; color: var(--secondary-text-color, #666); }
     .kpi .value { font-size: 1.4em; font-weight: 600; margin-top: 4px; }
+    .kpi .sub { font-size: 0.75em; color: var(--secondary-text-color, #666); margin-top: 2px; }
+    .kpi.highlight { border-color: #34a853; }
     .section {
       background: var(--card-background-color, #fff); border: 1px solid var(--divider-color, #e0e0e0);
       border-radius: 10px; padding: 16px; margin-bottom: 16px; break-inside: avoid;
@@ -335,6 +337,14 @@ export class HeatReport extends LitElement {
     const own = data.map((m) => m.solar_own_use_kwh ?? 0);
     const sold = data.map((m) => m.solar_sold_kwh ?? 0);
     const solarShare = totalKwh > 0 ? (this._sum(own) / totalKwh) * 100 : 0;
+    const tot = (k: keyof HeatSourceMonthly) => this._sum(data.map((m) => (m[k] as number) ?? 0));
+    const boughtKwh = tot("purchased_kwh");
+    const boughtSek = tot("purchased_cost_sek");
+    const avoided = tot("own_use_avoided_sek");
+    const saving = avoided - tot("own_use_alt_income_sek");
+    const ownKwh = this._sum(own);
+    const kpi = (label: string, value: string, sub = "", cls = "") =>
+      html`<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div>${sub ? html`<div class="sub">${sub}</div>` : nothing}</div>`;
     const legend = this._legend(series);
 
     return html`
@@ -344,10 +354,16 @@ export class HeatReport extends LitElement {
         <div class="period">${this.periodLabel}</div>
 
         <div class="kpis">
-          <div class="kpi"><div class="label">${t(this.hass, "report.totalEnergy")}</div><div class="value">${this._num(totalKwh)} kWh</div></div>
-          <div class="kpi"><div class="label">${t(this.hass, "report.totalCost")}</div><div class="value">${this._num(totalSek)} SEK</div></div>
-          <div class="kpi"><div class="label">${t(this.hass, "report.avgPrice")}</div><div class="value">${totalKwh > 0 ? this._num(totalSek / totalKwh, 2) : "–"} kr/kWh</div></div>
-          <div class="kpi"><div class="label">${t(this.hass, "report.solarShare")}</div><div class="value">${this._num(solarShare, 1)} %</div></div>
+          ${kpi(t(this.hass, "report.totalEnergy"), `${this._num(totalKwh)} kWh`)}
+          ${kpi(t(this.hass, "report.purchasedEnergy"), `${this._num(boughtKwh)} kWh`)}
+          ${kpi(t(this.hass, "report.ownSolarEnergy"), `${this._num(ownKwh)} kWh`, `${this._num(solarShare, 1)} % ${t(this.hass, "report.ofConsumption")}`)}
+          ${kpi(t(this.hass, "report.solarSold"), `${this._num(this._sum(sold))} kWh`)}
+        </div>
+        <div class="kpis">
+          ${kpi(t(this.hass, "report.totalCost"), `${this._num(totalSek)} SEK`, `${totalKwh > 0 ? this._num(totalSek / totalKwh, 2) : "–"} kr/kWh`)}
+          ${kpi(t(this.hass, "report.purchasedCost"), `${this._num(boughtSek)} SEK`, `${boughtKwh > 0 ? this._num(boughtSek / boughtKwh, 2) : "–"} kr/kWh`)}
+          ${kpi(t(this.hass, "report.ownSolarValue"), `${this._num(avoided)} SEK`, t(this.hass, "report.ownSolarValueSub"))}
+          ${kpi(t(this.hass, "report.saving"), `${this._num(saving)} SEK`, `${ownKwh > 0 ? this._num(saving / ownKwh, 2) : "–"} kr/kWh ${t(this.hass, "report.savingSub")}`, "highlight")}
         </div>
 
         <div class="section">

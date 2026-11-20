@@ -196,6 +196,11 @@ export interface HeatSourceBreakdown {
   house_cost_sek?: number;
   other_energy_kwh?: number;
   other_cost_sek?: number;
+  purchased_kwh?: number;
+  purchased_cost_sek?: number;
+  own_use_kwh?: number;
+  own_use_avoided_sek?: number;
+  own_use_alt_income_sek?: number;
 }
 
 export interface HeatSourceMonthly extends HeatSourceBreakdown {
